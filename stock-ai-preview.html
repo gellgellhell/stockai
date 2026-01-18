@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock AI - App Preview</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    body {
+      background: #E5E7EB;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .phone-container {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .phone-wrapper {
+      position: relative;
+      padding-top: 40px;
+    }
+    
+    .screen-label {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #3B82F6;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    
+    .phone {
+      width: 375px;
+      height: 780px;
+      background: #FFFFFF;
+      border-radius: 44px;
+      border: 10px solid #1F2937;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+    }
+    
+    .notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 150px;
+      height: 30px;
+      background: #1F2937;
+      border-radius: 0 0 20px 20px;
+      z-index: 10;
+    }
+    
+    .phone-header {
+      height: 54px;
+      background: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-top: 30px;
+      border-bottom: 1px solid #F3F4F6;
+    }
+    
+    .phone-header h1 {
+      color: #1F2937;
+      font-size: 17px;
+      font-weight: 600;
+    }
+    
+    .phone-content {
+      height: calc(100% - 54px - 64px);
+      overflow-y: auto;
+      background: #F9FAFB;
+    }
+    
+    .tab-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: #FFFFFF;
+      border-top: 1px solid #F3F4F6;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 10px 8px;
+    }
+    
+    .tab-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #9CA3AF;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .tab-item.active { color: #3B82F6; }
+    .tab-item svg { width: 22px; height: 22px; margin-bottom: 4px; }
+    
+    /* Login Screen */
+    .login-top {
+      background: #3B82F6;
+      height: 35%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding-top: 30px;
+    }
+    
+    .login-logo {
+      font-size: 38px;
+      color: #FFFFFF;
+    }
+    
+    .login-logo span { font-weight: 300; }
+    .login-logo strong { font-weight: 800; }
+    
+    .login-tagline {
+      color: rgba(255,255,255,0.8);
+      font-size: 15px;
+      margin-top: 8px;
+    }
+    
+    .login-bottom {
+      background: #FFFFFF;
+      height: 65%;
+      border-radius: 30px 30px 0 0;
+      margin-top: -30px;
+      padding: 32px 24px;
+    }
+    
+    .login-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1F2937;
+      margin-bottom: 8px;
+    }
+    
+    .login-subtitle {
+      font-size: 14px;
+      color: #6B7280;
+      margin-bottom: 24px;
+    }
+    
+    .login-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+    }
+    
+    .login-btn.primary { background: #3B82F6; color: #FFF; }
+    .login-btn.secondary { background: #FFF; color: #1F2937; border: 1px solid #E5E7EB; }
+    .login-btn.kakao { background: #FEE500; color: #3C1E1E; }
+    
+    /* Cards */
+    .card {
+      background: #FFFFFF;
+      margin: 16px;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .card-label {
+      font-size: 14px;
+      color: #6B7280;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .refresh-info {
+      text-align: right;
+      font-size: 12px;
+    }
+    
+    .refresh-count {
+      color: #3B82F6;
+      font-weight: 600;
+    }
+    
+    .score-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    
+    .score-number {
+      font-size: 48px;
+      font-weight: 700;
+      color: #1F2937;
+    }
+    
+    .score-unit {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1F2937;
+      margin-right: 12px;
+    }
+    
+    .score-badge {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      margin-bottom: 12px;
+    }
+    
+    .section-title { font-size: 18px; font-weight: 600; color: #1F2937; }
+    .limit-text { font-size: 14px; color: #3B82F6; }
+    
+    .stock-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #FFFFFF;
+      padding: 16px;
+      margin: 0 16px 8px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    
+    .stock-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .stock-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFF;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    
+    .stock-icon.crypto { background: #3B82F6; }
+    .stock-icon.stock { background: #10B981; }
+    
+    .stock-symbol { font-size: 16px; font-weight: 600; color: #1F2937; }
+    .stock-name { font-size: 13px; color: #6B7280; }
+    
+    .stock-right { 
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    
+    .ai-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFF;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    
+    .ai-badge.good { background: #10B981; }
+    .ai-badge.medium { background: #F59E0B; }
+    .ai-badge.bad { background: #EF4444; }
+    
+    .stock-change { font-size: 13px; font-weight: 500; }
+    .stock-change.up { color: #10B981; }
+    .stock-change.down { color: #EF4444; }
+    
+    .add-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #FFFFFF;
+      margin: 0 16px;
+      padding: 16px;
+      border-radius: 12px;
+      border: 2px dashed #E5E7EB;
+      color: #9CA3AF;
+      font-size: 15px;
+    }
+    
+    .refresh-btn {
+      position: absolute;
+      bottom: 80px;
+      left: 16px;
+      right: 16px;
+      background: #3B82F6;
+      color: #FFF;
+      padding: 16px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    /* Trending Screen */
+    .period-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 16px;
+    }
+    
+    .period-tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      background: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #6B7280;
+      cursor: pointer;
+    }
+    
+    .period-tab.active {
+      background: #3B82F6;
+      border-color: #3B82F6;
+      color: #FFFFFF;
+    }
+    
+    .sort-btns {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 12px;
+    }
+    
+    .sort-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 12px;
+      border-radius: 20px;
+      background: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      font-size: 13px;
+      color: #6B7280;
+      cursor: pointer;
+    }
+    
+    .sort-btn.active {
+      background: #EFF6FF;
+      border-color: #3B82F6;
+      color: #3B82F6;
+    }
+    
+    .trending-item {
+      display: flex;
+      align-items: center;
+      background: #FFFFFF;
+      padding: 14px;
+      margin: 0 16px 8px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    
+    .rank-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: #F3F4F6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #6B7280;
+      margin-right: 10px;
+    }
+    
+    .rank-badge.top {
+      background: #3B82F6;
+      color: #FFFFFF;
+    }
+    
+    .trending-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFF;
+      font-size: 16px;
+      font-weight: 700;
+      margin-right: 12px;
+    }
+    
+    .trending-info {
+      flex: 1;
+    }
+    
+    .trending-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1F2937;
+      margin-bottom: 4px;
+    }
+    
+    .trending-stats {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+      color: #9CA3AF;
+    }
+    
+    .stat { display: flex; align-items: center; gap: 4px; }
+    
+    .trending-score {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFF;
+      font-size: 13px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone-container">
+    
+    <!-- Login Screen -->
+    <div class="phone-wrapper">
+      <div class="screen-label">로그인</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="phone-content" style="background: #3B82F6; height: 100%;">
+          <div class="login-top">
+            <div class="login-logo"><span>Stock</span><strong>AI</strong></div>
+            <div class="login-tagline">AI가 분석하는 스마트 투자</div>
+          </div>
+          <div class="login-bottom">
+            <div class="login-title">환영합니다</div>
+            <div class="login-subtitle">로그인하고 AI 투자 분석을 시작하세요</div>
+            
+            <div style="margin-top: 40px;">
+              <button class="login-btn primary">Google로 계속하기</button>
+              <button class="login-btn secondary">Apple로 계속하기</button>
+              <button class="login-btn kakao">카카오로 계속하기</button>
+            </div>
+            
+            <p style="text-align: center; color: #9CA3AF; font-size: 12px; margin-top: 24px; line-height: 1.5;">
+              계속 진행하면 서비스 이용약관 및<br>개인정보처리방침에 동의하는 것으로 간주됩니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Home Screen -->
+    <div class="phone-wrapper">
+      <div class="screen-label">홈</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="phone-header">
+          <h1>Stock AI</h1>
+        </div>
+        <div class="phone-content">
+          <div class="card">
+            <div class="card-label">
+              <span>오늘의 내 관심 분야 점수</span>
+              <div class="refresh-info">
+                <div style="color: #9CA3AF;">새로고침</div>
+                <div class="refresh-count">5/5</div>
+              </div>
+            </div>
+            <div class="score-row">
+              <span class="score-number">68</span>
+              <span class="score-unit">점</span>
+              <span class="score-badge">좋음</span>
+            </div>
+          </div>
+          
+          <div class="section-header">
+            <span class="section-title">내 관심 종목</span>
+            <span class="limit-text">4/1 종목</span>
+          </div>
+          
+          <div class="stock-item">
+            <div class="stock-left">
+              <div class="stock-icon crypto">B</div>
+              <div>
+                <div class="stock-symbol">BTC</div>
+                <div class="stock-name">비트코인</div>
+              </div>
+            </div>
+            <div class="stock-right">
+              <div class="ai-badge good">78</div>
+              <span class="stock-change up">▲ 2.34%</span>
+            </div>
+          </div>
+          
+          <div class="stock-item">
+            <div class="stock-left">
+              <div class="stock-icon crypto">E</div>
+              <div>
+                <div class="stock-symbol">ETH</div>
+                <div class="stock-name">이더리움</div>
+              </div>
+            </div>
+            <div class="stock-right">
+              <div class="ai-badge medium">65</div>
+              <span class="stock-change down">▼ 1.23%</span>
+            </div>
+          </div>
+          
+          <div class="stock-item">
+            <div class="stock-left">
+              <div class="stock-icon stock">A</div>
+              <div>
+                <div class="stock-symbol">AAPL</div>
+                <div class="stock-name">애플</div>
+              </div>
+            </div>
+            <div class="stock-right">
+              <div class="ai-badge good">82</div>
+              <span class="stock-change up">▲ 0.87%</span>
+            </div>
+          </div>
+          
+          <div class="stock-item">
+            <div class="stock-left">
+              <div class="stock-icon stock">T</div>
+              <div>
+                <div class="stock-symbol">TSLA</div>
+                <div class="stock-name">테슬라</div>
+              </div>
+            </div>
+            <div class="stock-right">
+              <div class="ai-badge bad">45</div>
+              <span class="stock-change down">▼ 2.45%</span>
+            </div>
+          </div>
+          
+          <div class="add-btn">
+            <span style="font-size: 20px;">+</span>
+            관심 종목 추가
+          </div>
+        </div>
+        
+        <div class="refresh-btn">🔄 AI 분석 새로고침</div>
+        
+        <div class="tab-bar">
+          <div class="tab-item active">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            <span>홈</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+            <span>인기 종목</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <span>검색</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            <span>설정</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Trending Screen -->
+    <div class="phone-wrapper">
+      <div class="screen-label">인기 종목</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="phone-header">
+          <h1>인기 종목</h1>
+        </div>
+        <div class="phone-content">
+          <div class="period-tabs">
+            <div class="period-tab active">24시간</div>
+            <div class="period-tab">7일</div>
+            <div class="period-tab">1개월</div>
+          </div>
+          
+          <div class="sort-btns">
+            <div class="sort-btn active">👁 조회 많은 순</div>
+            <div class="sort-btn">❤️ 등록 많은 순</div>
+          </div>
+          
+          <div class="trending-item">
+            <div class="rank-badge top">1</div>
+            <div class="trending-icon" style="background: #3B82F6;">B</div>
+            <div class="trending-info">
+              <div class="trending-name">비트코인</div>
+              <div class="trending-stats">
+                <span class="stat">👁 1.2만</span>
+                <span class="stat">❤️ 3.4천</span>
+              </div>
+            </div>
+            <div class="trending-score" style="background: #10B981;">85</div>
+          </div>
+          
+          <div class="trending-item">
+            <div class="rank-badge top">2</div>
+            <div class="trending-icon" style="background: #3B82F6;">E</div>
+            <div class="trending-info">
+              <div class="trending-name">이더리움</div>
+              <div class="trending-stats">
+                <span class="stat">👁 9.8천</span>
+                <span class="stat">❤️ 2.8천</span>
+              </div>
+            </div>
+            <div class="trending-score" style="background: #10B981;">72</div>
+          </div>
+          
+          <div class="trending-item">
+            <div class="rank-badge top">3</div>
+            <div class="trending-icon" style="background: #10B981;">N</div>
+            <div class="trending-info">
+              <div class="trending-name">엔비디아</div>
+              <div class="trending-stats">
+                <span class="stat">👁 8.2천</span>
+                <span class="stat">❤️ 2.1천</span>
+              </div>
+            </div>
+            <div class="trending-score" style="background: #10B981;">88</div>
+          </div>
+          
+          <div class="trending-item">
+            <div class="rank-badge">4</div>
+            <div class="trending-icon" style="background: #10B981;">T</div>
+            <div class="trending-info">
+              <div class="trending-name">테슬라</div>
+              <div class="trending-stats">
+                <span class="stat">👁 7.6천</span>
+                <span class="stat">❤️ 1.9천</span>
+              </div>
+            </div>
+            <div class="trending-score" style="background: #EF4444;">45</div>
+          </div>
+          
+          <div class="trending-item">
+            <div class="rank-badge">5</div>
+            <div class="trending-icon" style="background: #3B82F6;">S</div>
+            <div class="trending-info">
+              <div class="trending-name">솔라나</div>
+              <div class="trending-stats">
+                <span class="stat">👁 6.5천</span>
+                <span class="stat">❤️ 1.6천</span>
+              </div>
+            </div>
+            <div class="trending-score" style="background: #10B981;">76</div>
+          </div>
+          
+          <div class="trending-item">
+            <div class="rank-badge">6</div>
+            <div class="trending-icon" style="background: #10B981;">A</div>
+            <div class="trending-info">
+              <div class="trending-name">애플</div>
+              <div class="trending-stats">
+                <span class="stat">👁 5.4천</span>
+                <span class="stat">❤️ 1.4천</span>
+              </div>
+            </div>
+            <div class="trending-score" style="background: #10B981;">82</div>
+          </div>
+        </div>
+        
+        <div class="tab-bar">
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            <span>홈</span>
+          </div>
+          <div class="tab-item active">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+            <span>인기 종목</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <span>검색</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            <span>설정</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</body>
+</html>

@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native builds
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# Environment variables
+.env
+.env*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+coverage/
+
+# Backend
+backend/node_modules/
+backend/*.db
+backend/.env
+
+# Logs
+*.log
+logs/
+
+# Build
+build/
+*.ipa
+*.apk
+*.aab
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+*.db
+*.db-shm
+*.db-wal
