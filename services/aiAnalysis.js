@@ -3,10 +3,10 @@
  * Node.js 백엔드와 통신하여 GPT 기반 점수 가져오기
  */
 
-// 개발 환경에서는 localhost, 프로덕션에서는 실제 서버 URL 사용
+// 개발 환경에서는 localhost, 프로덕션에서는 Railway 서버 URL 사용
 const API_BASE = __DEV__
   ? 'http://localhost:3001/api'
-  : 'https://your-production-server.com/api'; // 나중에 배포 URL로 변경
+  : 'https://stockai-backend-production.up.railway.app/api';
 
 /**
  * 단일 종목 상세 분석 (GPT 사용)

@@ -8,7 +8,9 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = __DEV__
+  ? 'http://localhost:3001/api'
+  : 'https://stockai-backend-production.up.railway.app/api';
 
 // 알림 핸들러 설정
 Notifications.setNotificationHandler({

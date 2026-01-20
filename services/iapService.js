@@ -6,7 +6,9 @@
 import { Platform } from 'react-native';
 import { getSkus, getProductBySku } from '../config/iapConfig';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = __DEV__
+  ? 'http://localhost:3001/api'
+  : 'https://stockai-backend-production.up.railway.app/api';
 
 // react-native-iap가 설치된 경우에만 import
 let RNIap = null;

@@ -3,7 +3,9 @@
  * 백엔드 광고 API와 통신
  */
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = __DEV__
+  ? 'http://localhost:3001/api'
+  : 'https://stockai-backend-production.up.railway.app/api';
 
 /**
  * 광고 설정 조회

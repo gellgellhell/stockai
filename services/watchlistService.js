@@ -3,7 +3,9 @@
  * 백엔드 관심종목 API 통신
  */
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = __DEV__
+  ? 'http://localhost:3001/api'
+  : 'https://stockai-backend-production.up.railway.app/api';
 
 /**
  * 관심종목 목록 조회
