@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getCryptoData, getStockData } from './services/marketApi';
+import { useTheme } from './ThemeContext';
 
 // 임시 AI 점수 생성 (실제로는 AI 분석 결과 사용)
 const generateAIScore = (change) => {
@@ -33,6 +34,8 @@ const getScoreLabel = (score) => {
 };
 
 export default function HomeScreen({ navigation }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
   const [refreshing, setRefreshing] = useState(false);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,34 +91,34 @@ export default function HomeScreen({ navigation }) {
 
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={{ marginTop: 12, color: '#6B7280' }}>데이터 로딩 중...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 12, color: colors.textSecondary }}>데이터 로딩 중...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
         {/* 오늘의 내 관심 분야 점수 */}
-        <View style={styles.scoreCard}>
+        <View style={[styles.scoreCard, { backgroundColor: colors.card }]}>
           <View style={styles.scoreHeader}>
-            <Text style={styles.scoreLabel}>오늘의 내 관심 분야 점수</Text>
+            <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>오늘의 내 관심 분야 점수</Text>
             <View style={styles.refreshInfo}>
-              <Text style={styles.refreshLabel}>새로고침</Text>
-              <Text style={styles.refreshCount}>{refreshCount}/5</Text>
+              <Text style={[styles.refreshLabel, { color: colors.textTertiary }]}>새로고침</Text>
+              <Text style={[styles.refreshCount, { color: colors.primary }]}>{refreshCount}/5</Text>
             </View>
           </View>
           <View style={styles.scoreRow}>
-            <Text style={styles.scoreNumber}>{avgScore}</Text>
-            <Text style={styles.scoreUnit}>점</Text>
+            <Text style={[styles.scoreNumber, { color: colors.text }]}>{avgScore}</Text>
+            <Text style={[styles.scoreUnit, { color: colors.text }]}>점</Text>
             <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(avgScore) + '20' }]}>
               <Text style={[styles.scoreBadgeText, { color: getScoreColor(avgScore) }]}>
                 {getScoreLabel(avgScore)}
@@ -127,34 +130,34 @@ export default function HomeScreen({ navigation }) {
         {/* 내 관심 종목 리스트 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>내 관심 종목</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>내 관심 종목</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Subscription')}>
-              <Text style={styles.limitText}>{stocks.length}/1 종목</Text>
+              <Text style={[styles.limitText, { color: colors.primary }]}>{stocks.length}/1 종목</Text>
             </TouchableOpacity>
           </View>
 
           {stocks.map((stock, index) => (
             <TouchableOpacity
               key={stock.symbol + index}
-              style={styles.stockCard}
+              style={[styles.stockCard, { backgroundColor: colors.card }]}
               onPress={() => navigation.navigate('StockDetail', { stock })}
             >
               <View style={styles.stockLeft}>
                 <View style={[styles.stockIcon, {
-                  backgroundColor: stock.type === 'crypto' ? '#3B82F6' : '#10B981'
+                  backgroundColor: stock.type === 'crypto' ? colors.primary : colors.success
                 }]}>
                   <Text style={styles.stockIconText}>{stock.symbol?.charAt(0)}</Text>
                 </View>
                 <View>
-                  <Text style={styles.stockSymbol}>{stock.symbol}</Text>
-                  <Text style={styles.stockName}>{stock.nameKr || stock.name}</Text>
+                  <Text style={[styles.stockSymbol, { color: colors.text }]}>{stock.symbol}</Text>
+                  <Text style={[styles.stockName, { color: colors.textSecondary }]}>{stock.nameKr || stock.name}</Text>
                 </View>
               </View>
 
               <View style={styles.stockMiddle}>
-                <Text style={styles.stockPrice}>{formatPrice(stock.price, stock.type)}</Text>
+                <Text style={[styles.stockPrice, { color: colors.text }]}>{formatPrice(stock.price, stock.type)}</Text>
                 <Text style={[styles.stockChange, {
-                  color: (stock.change || 0) >= 0 ? '#10B981' : '#EF4444'
+                  color: (stock.change || 0) >= 0 ? colors.success : colors.error
                 }]}>
                   {(stock.change || 0) >= 0 ? '▲' : '▼'} {Math.abs(stock.change || 0).toFixed(2)}%
                 </Text>
@@ -167,12 +170,12 @@ export default function HomeScreen({ navigation }) {
           ))}
 
           {/* 종목 추가 버튼 */}
-          <TouchableOpacity 
-            style={styles.addButton}
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => navigation.navigate('Search')}
           >
-            <Ionicons name="add" size={24} color="#9CA3AF" />
-            <Text style={styles.addButtonText}>관심 종목 추가</Text>
+            <Ionicons name="add" size={24} color={colors.textTertiary} />
+            <Text style={[styles.addButtonText, { color: colors.textTertiary }]}>관심 종목 추가</Text>
           </TouchableOpacity>
         </View>
 
@@ -180,7 +183,7 @@ export default function HomeScreen({ navigation }) {
       </ScrollView>
 
       {/* 새로고침 버튼 */}
-      <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+      <TouchableOpacity style={[styles.refreshButton, { backgroundColor: colors.primary }]} onPress={onRefresh}>
         <Ionicons name="refresh" size={20} color="#FFFFFF" />
         <Text style={styles.refreshButtonText}>AI 분석 새로고침</Text>
       </TouchableOpacity>

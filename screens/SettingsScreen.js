@@ -16,23 +16,29 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../OnboardingContext';
+import { useTheme } from '../ThemeContext';
 
-const SettingItem = ({ icon, iconColor, title, subtitle, onPress, rightComponent }) => (
-  <TouchableOpacity style={styles.settingItem} onPress={onPress} disabled={!onPress}>
+const SettingItem = ({ icon, iconColor, title, subtitle, onPress, rightComponent, colors }) => (
+  <TouchableOpacity
+    style={[styles.settingItem, { backgroundColor: colors.card }]}
+    onPress={onPress}
+    disabled={!onPress}
+  >
     <View style={[styles.settingIconContainer, { backgroundColor: iconColor + '20' }]}>
       <Ionicons name={icon} size={20} color={iconColor} />
     </View>
     <View style={styles.settingContent}>
-      <Text style={styles.settingTitle}>{title}</Text>
-      {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+      <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
+      {subtitle && <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>}
     </View>
-    {rightComponent || (onPress && <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />)}
+    {rightComponent || (onPress && <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />)}
   </TouchableOpacity>
 );
 
 const SettingsScreen = ({ navigation }) => {
   const { resetOnboarding } = useOnboarding();
-  const [darkMode, setDarkMode] = React.useState(false);
+  const { theme, isDark, toggleTheme } = useTheme();
+  const colors = theme.colors;
 
   const handleUpgrade = () => {
     navigation.navigate('Subscription');
@@ -65,134 +71,146 @@ const SettingsScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 헤더 */}
-      <View style={styles.header}>
-        <Text style={styles.title}>설정</Text>
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.title, { color: colors.text }]}>설정</Text>
       </View>
 
       <ScrollView style={styles.content}>
         {/* 계정 섹션 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>계정</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>계정</Text>
 
-          <View style={styles.profileCard}>
-            <View style={styles.profileAvatar}>
-              <Ionicons name="person" size={32} color="#6B7280" />
+          <View style={[styles.profileCard, { backgroundColor: colors.card }]}>
+            <View style={[styles.profileAvatar, { backgroundColor: colors.surfaceSecondary }]}>
+              <Ionicons name="person" size={32} color={colors.textSecondary} />
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>사용자</Text>
-              <Text style={styles.profileEmail}>user@example.com</Text>
+              <Text style={[styles.profileName, { color: colors.text }]}>사용자</Text>
+              <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>user@example.com</Text>
             </View>
-            <View style={styles.planBadge}>
-              <Text style={styles.planBadgeText}>Free</Text>
+            <View style={[styles.planBadge, { backgroundColor: colors.surfaceSecondary }]}>
+              <Text style={[styles.planBadgeText, { color: colors.textSecondary }]}>Free</Text>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.upgradeCard} onPress={handleUpgrade}>
+          <TouchableOpacity
+            style={[styles.upgradeCard, { backgroundColor: isDark ? '#2E1065' : '#F5F3FF', borderColor: isDark ? '#6D28D9' : '#DDD6FE' }]}
+            onPress={handleUpgrade}
+          >
             <View style={styles.upgradeContent}>
               <Ionicons name="diamond" size={24} color="#8B5CF6" />
               <View style={styles.upgradeText}>
-                <Text style={styles.upgradeTitle}>Pro 플랜으로 업그레이드</Text>
-                <Text style={styles.upgradeSubtitle}>무제한 분석, 광고 제거</Text>
+                <Text style={[styles.upgradeTitle, { color: colors.text }]}>Pro 플랜으로 업그레이드</Text>
+                <Text style={[styles.upgradeSubtitle, { color: colors.textSecondary }]}>무제한 분석, 광고 제거</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
           </TouchableOpacity>
         </View>
 
         {/* 앱 설정 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>앱 설정</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>앱 설정</Text>
 
           <SettingItem
             icon="notifications"
-            iconColor="#3B82F6"
+            iconColor={colors.primary}
             title="알림 설정"
             subtitle="푸시 알림, 가격 알림"
             onPress={handleNotificationSettings}
+            colors={colors}
           />
 
           <SettingItem
             icon="moon"
             iconColor="#6366F1"
             title="다크 모드"
+            colors={colors}
             rightComponent={
               <Switch
-                value={darkMode}
-                onValueChange={setDarkMode}
+                value={isDark}
+                onValueChange={toggleTheme}
                 trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
-                thumbColor={darkMode ? '#3B82F6' : '#F3F4F6'}
+                thumbColor={isDark ? '#3B82F6' : '#F3F4F6'}
               />
             }
           />
 
           <SettingItem
             icon="language"
-            iconColor="#10B981"
+            iconColor={colors.success}
             title="언어"
             subtitle="한국어"
             onPress={() => {}}
+            colors={colors}
           />
         </View>
 
         {/* 데이터 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>데이터</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>데이터</Text>
 
           <SettingItem
             icon="cloud-download"
-            iconColor="#F59E0B"
+            iconColor={colors.warning}
             title="데이터 백업"
             subtitle="관심종목, 알림 설정"
             onPress={() => {}}
+            colors={colors}
           />
 
           <SettingItem
             icon="trash"
-            iconColor="#EF4444"
+            iconColor={colors.error}
             title="캐시 삭제"
             subtitle="120 MB"
             onPress={() => Alert.alert('캐시 삭제', '캐시가 삭제되었습니다.')}
+            colors={colors}
           />
         </View>
 
         {/* 정보 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>정보</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>정보</Text>
 
           <SettingItem
             icon="document-text"
-            iconColor="#6B7280"
+            iconColor={colors.icon}
             title="이용약관"
             onPress={() => {}}
+            colors={colors}
           />
 
           <SettingItem
             icon="shield-checkmark"
-            iconColor="#6B7280"
+            iconColor={colors.icon}
             title="개인정보처리방침"
             onPress={() => {}}
+            colors={colors}
           />
 
           <SettingItem
             icon="help-circle"
-            iconColor="#6B7280"
+            iconColor={colors.icon}
             title="도움말"
             onPress={() => {}}
+            colors={colors}
           />
 
           <SettingItem
             icon="information-circle"
-            iconColor="#6B7280"
+            iconColor={colors.icon}
             title="앱 버전"
             subtitle="1.0.0"
+            colors={colors}
           />
         </View>
 
         {/* 개발자 옵션 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>개발자 옵션</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>개발자 옵션</Text>
 
           <SettingItem
             icon="refresh"
@@ -200,13 +218,14 @@ const SettingsScreen = ({ navigation }) => {
             title="온보딩 초기화"
             subtitle="온보딩을 다시 봅니다"
             onPress={handleResetOnboarding}
+            colors={colors}
           />
         </View>
 
         {/* 로그아웃 */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-          <Text style={styles.logoutText}>로그아웃</Text>
+        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.errorBg }]} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={20} color={colors.error} />
+          <Text style={[styles.logoutText, { color: colors.error }]}>로그아웃</Text>
         </TouchableOpacity>
 
         <View style={styles.bottomPadding} />

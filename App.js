@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,8 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { OnboardingProvider, useOnboarding } from './OnboardingContext';
 import { WatchlistProvider } from './WatchlistContext';
 import { NotificationProvider } from './NotificationContext';
-import { View, ActivityIndicator, Text, Platform }from 'react-native';
+import { ThemeProvider, useTheme } from './ThemeContext';
+import { View, ActivityIndicator, Text, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Screens (현재 프로젝트는 screens가 루트에 있음)
@@ -29,6 +30,9 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainTabs() {
+  const { theme } = useTheme();
+  const colors = theme.colors;
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -47,11 +51,11 @@ function MainTabs() {
 
           return <Ionicons name={iconName} size={22} color={color} />;
         },
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: colors.tabActive,
+        tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#F3F4F6',
+          backgroundColor: colors.tabBar,
+          borderTopColor: colors.tabBarBorder,
           paddingBottom: 8,
           paddingTop: 8,
           height: 64,
@@ -61,13 +65,13 @@ function MainTabs() {
           fontWeight: '500',
         },
         headerStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.surface,
           elevation: 0,
           shadowOpacity: 0,
           borderBottomWidth: 1,
-          borderBottomColor: '#F3F4F6',
+          borderBottomColor: colors.border,
         },
-        headerTintColor: '#1F2937',
+        headerTintColor: colors.text,
         headerTitleStyle: {
           fontWeight: '600',
           fontSize: 17,
@@ -104,11 +108,13 @@ function MainTabs() {
 function AppNavigator() {
   const { user, loading, isNewUser } = useAuth();
   const { hasCompletedOnboarding, loading: onboardingLoading } = useOnboarding();
+  const { theme, isLoaded: themeLoaded } = useTheme();
+  const colors = theme.colors;
 
-  if (loading || onboardingLoading) {
+  if (loading || onboardingLoading || !themeLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' }}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -117,13 +123,16 @@ function AppNavigator() {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.surface,
         },
-        headerTintColor: '#1F2937',
+        headerTintColor: colors.text,
         headerTitleStyle: {
           fontWeight: '600',
         },
         headerShadowVisible: false,
+        contentStyle: {
+          backgroundColor: colors.background,
+        },
       }}
     >
       {!hasCompletedOnboarding ? (
@@ -287,6 +296,45 @@ function KakaoCallbackHandler() {
   );
 }
 
+// 내부 앱 컴포넌트 (테마 적용)
+function AppContent() {
+  const { theme, isDark } = useTheme();
+
+  // Navigation 테마 설정
+  const navigationTheme = isDark ? {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      primary: theme.colors.primary,
+      background: theme.colors.background,
+      card: theme.colors.surface,
+      text: theme.colors.text,
+      border: theme.colors.border,
+    },
+  } : {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      primary: theme.colors.primary,
+      background: theme.colors.background,
+      card: theme.colors.surface,
+      text: theme.colors.text,
+      border: theme.colors.border,
+    },
+  };
+
+  return (
+    <NavigationContainer theme={navigationTheme}>
+      <NotificationProvider userId="temp_user">
+        <WatchlistProvider userId="temp_user">
+          <StatusBar style={theme.statusBar} />
+          <AppNavigator />
+        </WatchlistProvider>
+      </NotificationProvider>
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   // 웹에서 카카오 콜백 URL인지 확인
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -298,18 +346,13 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <OnboardingProvider>
-          <NavigationContainer>
-            <NotificationProvider userId="temp_user">
-              <WatchlistProvider userId="temp_user">
-                <StatusBar style="dark" />
-                <AppNavigator />
-              </WatchlistProvider>
-            </NotificationProvider>
-          </NavigationContainer>
-        </OnboardingProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <OnboardingProvider>
+            <AppContent />
+          </OnboardingProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
