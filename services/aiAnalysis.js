@@ -40,12 +40,13 @@ export const getDetailedAnalysis = async (symbol, type = 'crypto') => {
  * 빠른 점수 조회 (비용 절감)
  * @param {string} symbol - 종목 심볼
  * @param {string} type - 'crypto' 또는 'stock'
+ * @param {string} timeframe - 시간대 (1h, 4h, 1d, 1w)
  * @returns {Object} { score, signal, price, change24h }
  */
-export const getQuickScore = async (symbol, type = 'crypto') => {
+export const getQuickScore = async (symbol, type = 'crypto', timeframe = '1d') => {
   try {
     const response = await fetch(
-      `${API_BASE}/analysis/quick/${symbol}?type=${type}`
+      `${API_BASE}/analysis/quick/${symbol}?type=${type}&timeframe=${timeframe}`
     );
 
     if (!response.ok) {
@@ -61,6 +62,7 @@ export const getQuickScore = async (symbol, type = 'crypto') => {
       symbol,
       score: 50,
       signal: '중립',
+      timeframe,
       error: error.message
     };
   }

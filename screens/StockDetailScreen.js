@@ -1,6 +1,7 @@
 /**
  * 종목 상세 화면
  * 분석 결과 및 종목 정보 표시
+ * 시간대별 점수 표시 기능 포함
  */
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +15,60 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { getQuickScore, getScoreColor as getScoreColorFromService } from '../services/aiAnalysis';
+
+// 점수에 따른 색상 반환
+const getScoreColor = (score) => {
+  if (score === undefined || score === null) return '#6B7280';
+  if (score >= 70) return '#10B981';
+  if (score >= 40) return '#F59E0B';
+  return '#EF4444';
+};
+
+// 시간대 옵션
+const TIMEFRAMES = [
+  { id: '1h', label: '1시간', description: '단기' },
+  { id: '4h', label: '4시간', description: '중단기' },
+  { id: '1d', label: '1일', description: '중기' },
+  { id: '1w', label: '1주', description: '장기' },
+];
+
+// 시간대 선택 탭
+const TimeframeSelector = ({ selected, onSelect, loading }) => (
+  <View style={styles.timeframeContainer}>
+    <Text style={styles.timeframeTitle}>분석 시간대</Text>
+    <View style={styles.timeframeTabs}>
+      {TIMEFRAMES.map((tf) => (
+        <TouchableOpacity
+          key={tf.id}
+          style={[
+            styles.timeframeTab,
+            selected === tf.id && styles.timeframeTabActive,
+          ]}
+          onPress={() => onSelect(tf.id)}
+          disabled={loading}
+        >
+          <Text
+            style={[
+              styles.timeframeTabText,
+              selected === tf.id && styles.timeframeTabTextActive,
+            ]}
+          >
+            {tf.label}
+          </Text>
+          <Text
+            style={[
+              styles.timeframeTabDesc,
+              selected === tf.id && styles.timeframeTabDescActive,
+            ]}
+          >
+            {tf.description}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
 
 // 분석 결과 카드
 const AnalysisCard = ({ title, icon, color, children }) => (
@@ -47,37 +102,119 @@ const SignalBadge = ({ signal }) => {
 };
 
 const StockDetailScreen = ({ navigation, route }) => {
-  const { symbol = 'AAPL', name = 'Apple Inc.', analysisLevel = 1 } = route.params || {};
+  const { symbol = 'AAPL', name = 'Apple Inc.', analysisLevel = 1, type = 'stock' } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [analysisData, setAnalysisData] = useState(null);
+  const [selectedTimeframe, setSelectedTimeframe] = useState('1d');
+  const [timeframeScores, setTimeframeScores] = useState({});
+  const [timeframeLoading, setTimeframeLoading] = useState(false);
 
-  // 분석 데이터 로드 시뮬레이션
+  // 시간대별 점수 가져오기
+  const fetchTimeframeScore = async (timeframe) => {
+    try {
+      setTimeframeLoading(true);
+      const result = await getQuickScore(symbol, type, timeframe);
+      setTimeframeScores((prev) => ({
+        ...prev,
+        [timeframe]: result,
+      }));
+
+      // 현재 선택된 시간대면 분석 데이터 업데이트
+      if (timeframe === selectedTimeframe) {
+        updateAnalysisWithScore(result);
+      }
+    } catch (error) {
+      console.error('Timeframe score error:', error);
+    } finally {
+      setTimeframeLoading(false);
+    }
+  };
+
+  // 점수 데이터로 분석 데이터 업데이트
+  const updateAnalysisWithScore = (scoreData) => {
+    if (!scoreData) return;
+
+    setAnalysisData((prev) => ({
+      ...prev,
+      confidence: scoreData.score || prev?.confidence || 50,
+      signal: getSignalFromScore(scoreData.score),
+      price: scoreData.price || prev?.price || 0,
+      change: scoreData.change24h || prev?.change || 0,
+      changePercent: scoreData.changePercent || prev?.changePercent || 0,
+    }));
+  };
+
+  // 점수로 시그널 결정
+  const getSignalFromScore = (score) => {
+    if (score >= 60) return 'buy';
+    if (score <= 40) return 'sell';
+    return 'hold';
+  };
+
+  // 시간대 변경 핸들러
+  const handleTimeframeChange = (timeframe) => {
+    setSelectedTimeframe(timeframe);
+
+    // 캐시된 데이터가 있으면 사용, 없으면 새로 fetch
+    if (timeframeScores[timeframe]) {
+      updateAnalysisWithScore(timeframeScores[timeframe]);
+    } else {
+      fetchTimeframeScore(timeframe);
+    }
+  };
+
+  // 초기 분석 데이터 로드
   useEffect(() => {
     const loadAnalysis = async () => {
       setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
 
+      // 기본 분석 데이터 설정
       setAnalysisData({
-        price: 182.52,
-        change: 2.34,
-        changePercent: 1.30,
-        signal: 'buy',
-        confidence: 78,
-        summary: 'AAPL은 현재 상승 추세에 있으며, 기술적 지표들이 긍정적인 신호를 보내고 있습니다. 단기적으로 추가 상승 여력이 있어 보입니다.',
+        price: 0,
+        change: 0,
+        changePercent: 0,
+        signal: 'hold',
+        confidence: 50,
+        summary: `${symbol}의 ${TIMEFRAMES.find(t => t.id === selectedTimeframe)?.label || '1일'} 기준 AI 분석 결과입니다.`,
         technicals: {
-          rsi: { value: 58.2, signal: '중립' },
-          macd: { value: 1.24, signal: '매수' },
-          ma20: { value: 178.50, signal: '지지' },
-          ma50: { value: 175.20, signal: '지지' },
+          rsi: { value: 50, signal: '중립' },
+          macd: { value: 0, signal: '중립' },
+          ma20: { value: 0, signal: '중립' },
+          ma50: { value: 0, signal: '중립' },
         },
         supportResistance: {
-          support1: 180.00,
-          support2: 175.50,
-          resistance1: 185.00,
-          resistance2: 190.00,
+          support1: 0,
+          support2: 0,
+          resistance1: 0,
+          resistance2: 0,
         },
-        patterns: ['상승 삼각형', '골든 크로스 형성 중'],
+        patterns: [],
       });
+
+      // 모든 시간대의 점수를 병렬로 가져오기
+      try {
+        const promises = TIMEFRAMES.map((tf) =>
+          getQuickScore(symbol, type, tf.id).then((result) => ({
+            timeframe: tf.id,
+            data: result,
+          }))
+        );
+
+        const results = await Promise.all(promises);
+        const scoresMap = {};
+        results.forEach(({ timeframe, data }) => {
+          scoresMap[timeframe] = data;
+        });
+        setTimeframeScores(scoresMap);
+
+        // 선택된 시간대 점수로 업데이트
+        if (scoresMap[selectedTimeframe]) {
+          updateAnalysisWithScore(scoresMap[selectedTimeframe]);
+        }
+      } catch (error) {
+        console.error('Load analysis error:', error);
+      }
+
       setLoading(false);
     };
 
@@ -137,16 +274,65 @@ const StockDetailScreen = ({ navigation, route }) => {
           </View>
         </View>
 
+        {/* 시간대 선택 */}
+        <TimeframeSelector
+          selected={selectedTimeframe}
+          onSelect={handleTimeframeChange}
+          loading={timeframeLoading}
+        />
+
+        {/* 시간대별 점수 미리보기 */}
+        <View style={styles.timeframeScoresPreview}>
+          {TIMEFRAMES.map((tf) => {
+            const score = timeframeScores[tf.id]?.score;
+            const isSelected = selectedTimeframe === tf.id;
+            return (
+              <View
+                key={tf.id}
+                style={[
+                  styles.scorePreviewItem,
+                  isSelected && styles.scorePreviewItemActive,
+                ]}
+              >
+                <Text style={styles.scorePreviewLabel}>{tf.label}</Text>
+                <Text
+                  style={[
+                    styles.scorePreviewValue,
+                    { color: getScoreColor(score) },
+                  ]}
+                >
+                  {score !== undefined ? score : '-'}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
         {/* 분석 시그널 */}
         <View style={styles.signalSection}>
-          <Text style={styles.signalLabel}>AI 분석 결과</Text>
+          <View style={styles.signalLabelRow}>
+            <Text style={styles.signalLabel}>AI 분석 결과</Text>
+            <View style={styles.timeframeBadge}>
+              <Ionicons name="time-outline" size={12} color="#3B82F6" />
+              <Text style={styles.timeframeBadgeText}>
+                {TIMEFRAMES.find((t) => t.id === selectedTimeframe)?.label || '1일'} 기준
+              </Text>
+            </View>
+          </View>
           <View style={styles.signalRow}>
             <SignalBadge signal={analysisData.signal} />
             <View style={styles.confidenceContainer}>
-              <Text style={styles.confidenceLabel}>신뢰도</Text>
-              <Text style={styles.confidenceValue}>{analysisData.confidence}%</Text>
+              <Text style={styles.confidenceLabel}>점수</Text>
+              <Text style={[styles.confidenceValue, { color: getScoreColor(analysisData.confidence) }]}>
+                {analysisData.confidence}
+              </Text>
             </View>
           </View>
+          {timeframeLoading && (
+            <View style={styles.timeframeLoadingOverlay}>
+              <ActivityIndicator size="small" color="#3B82F6" />
+            </View>
+          )}
         </View>
 
         {/* 분석 요약 */}
@@ -278,16 +464,123 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  // 시간대 선택 스타일
+  timeframeContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  timeframeTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  timeframeTabs: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  timeframeTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  timeframeTabActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#3B82F6',
+  },
+  timeframeTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  timeframeTabTextActive: {
+    color: '#3B82F6',
+  },
+  timeframeTabDesc: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  timeframeTabDescActive: {
+    color: '#60A5FA',
+  },
+  // 시간대별 점수 미리보기
+  timeframeScoresPreview: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  scorePreviewItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  scorePreviewItemActive: {
+    backgroundColor: '#EFF6FF',
+  },
+  scorePreviewLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  scorePreviewValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  // 분석 시그널 섹션
   signalSection: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+    position: 'relative',
+  },
+  signalLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   signalLabel: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 12,
+  },
+  timeframeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  timeframeBadgeText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#3B82F6',
+  },
+  timeframeLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
   },
   signalRow: {
     flexDirection: 'row',
