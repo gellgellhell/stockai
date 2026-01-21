@@ -10,9 +10,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from './AuthContext';
+import { useTheme } from './ThemeContext';
 
 export default function ProfileScreen({ navigation }) {
   const { user: authUser, signOut } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
+  const colors = theme.colors;
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [morningReportEnabled, setMorningReportEnabled] = React.useState(true);
 
@@ -40,66 +43,66 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const MenuItem = ({ icon, title, subtitle, onPress, rightComponent }) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+    <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={onPress}>
       <View style={styles.menuLeft}>
-        <View style={styles.menuIcon}>
-          <Ionicons name={icon} size={20} color="#3B82F6" />
+        <View style={[styles.menuIcon, { backgroundColor: colors.primaryBg }]}>
+          <Ionicons name={icon} size={20} color={colors.primary} />
         </View>
         <View style={styles.menuText}>
-          <Text style={styles.menuTitle}>{title}</Text>
-          {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+          <Text style={[styles.menuTitle, { color: colors.text }]}>{title}</Text>
+          {subtitle && <Text style={[styles.menuSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>}
         </View>
       </View>
-      {rightComponent || <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />}
+      {rightComponent || <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />}
     </TouchableOpacity>
   );
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       {/* 사용자 프로필 */}
-      <View style={styles.profileCard}>
-        <View style={styles.avatarContainer}>
+      <View style={[styles.profileCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
           <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
         </View>
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user.name}</Text>
-          <Text style={styles.profileEmail}>{user.email}</Text>
+          <Text style={[styles.profileName, { color: colors.text }]}>{user.name}</Text>
+          <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{user.email}</Text>
         </View>
       </View>
 
       {/* 구독 플랜 */}
-      <TouchableOpacity 
-        style={styles.planCard}
+      <TouchableOpacity
+        style={[styles.planCard, { backgroundColor: colors.card }]}
         onPress={() => navigation.navigate('Subscription')}
       >
         <View style={styles.planHeader}>
-          <View style={styles.planBadge}>
-            <Text style={styles.planBadgeText}>Free</Text>
+          <View style={[styles.planBadge, { backgroundColor: colors.surfaceSecondary }]}>
+            <Text style={[styles.planBadgeText, { color: colors.textSecondary }]}>Free</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
         </View>
-        
+
         <View style={styles.usageRow}>
           <View style={styles.usageItem}>
-            <Text style={styles.usageLabel}>등록 종목</Text>
-            <Text style={styles.usageValue}>{user.stocksUsed}/{user.stocksLimit}</Text>
+            <Text style={[styles.usageLabel, { color: colors.textTertiary }]}>등록 종목</Text>
+            <Text style={[styles.usageValue, { color: colors.text }]}>{user.stocksUsed}/{user.stocksLimit}</Text>
           </View>
-          <View style={styles.usageDivider} />
+          <View style={[styles.usageDivider, { backgroundColor: colors.border }]} />
           <View style={styles.usageItem}>
-            <Text style={styles.usageLabel}>오늘 새로고침</Text>
-            <Text style={styles.usageValue}>{user.refreshUsed}/{user.refreshLimit}</Text>
+            <Text style={[styles.usageLabel, { color: colors.textTertiary }]}>오늘 새로고침</Text>
+            <Text style={[styles.usageValue, { color: colors.text }]}>{user.refreshUsed}/{user.refreshLimit}</Text>
           </View>
         </View>
 
-        <View style={styles.upgradeRow}>
-          <Text style={styles.upgradeText}>업그레이드하고 더 많은 종목 등록하기</Text>
+        <View style={[styles.upgradeRow, { borderTopColor: colors.border }]}>
+          <Text style={[styles.upgradeText, { color: colors.primary }]}>업그레이드하고 더 많은 종목 등록하기</Text>
         </View>
       </TouchableOpacity>
 
       {/* 알림 설정 */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>알림 설정</Text>
-        <View style={styles.menuGroup}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>알림 설정</Text>
+        <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
           <MenuItem
             icon="notifications-outline"
             title="푸시 알림"
@@ -108,7 +111,7 @@ export default function ProfileScreen({ navigation }) {
               <Switch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
-                trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
+                trackColor={{ false: colors.border, true: colors.primary }}
                 thumbColor="#FFFFFF"
               />
             }
@@ -121,7 +124,7 @@ export default function ProfileScreen({ navigation }) {
               <Switch
                 value={morningReportEnabled}
                 onValueChange={setMorningReportEnabled}
-                trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
+                trackColor={{ false: colors.border, true: colors.primary }}
                 thumbColor="#FFFFFF"
               />
             }
@@ -136,8 +139,21 @@ export default function ProfileScreen({ navigation }) {
 
       {/* 일반 설정 */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>일반</Text>
-        <View style={styles.menuGroup}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>일반</Text>
+        <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
+          <MenuItem
+            icon="moon-outline"
+            title="다크 모드"
+            subtitle={isDark ? '켜짐' : '꺼짐'}
+            rightComponent={
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFFFFF"
+              />
+            }
+          />
           <MenuItem
             icon="card-outline"
             title="구독 관리"
@@ -153,8 +169,8 @@ export default function ProfileScreen({ navigation }) {
 
       {/* 지원 */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>지원</Text>
-        <View style={styles.menuGroup}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>지원</Text>
+        <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
           <MenuItem icon="help-circle-outline" title="도움말" />
           <MenuItem icon="chatbubble-outline" title="문의하기" />
           <MenuItem icon="document-text-outline" title="이용약관" />
@@ -163,11 +179,11 @@ export default function ProfileScreen({ navigation }) {
       </View>
 
       {/* 로그아웃 */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>로그아웃</Text>
+      <TouchableOpacity style={[styles.logoutButton, { borderColor: colors.errorBg }]} onPress={handleLogout}>
+        <Text style={[styles.logoutText, { color: colors.error }]}>로그아웃</Text>
       </TouchableOpacity>
 
-      <Text style={styles.versionText}>Stock AI v1.0.0</Text>
+      <Text style={[styles.versionText, { color: colors.textTertiary }]}>Stock AI v1.0.0</Text>
 
       <View style={{ height: 40 }} />
     </ScrollView>
