@@ -137,7 +137,7 @@ export default function ProfileScreen({ navigation }) {
 
       {/* 일반 설정 */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>일반</Text>
+        <Text style={styles.sectionTitle}>⚙️ 일반 설정</Text>
         <View style={styles.menuGroup}>
           <MenuItem
             icon="moon-outline"
