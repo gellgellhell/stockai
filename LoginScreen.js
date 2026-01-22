@@ -12,10 +12,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from './AuthContext';
+import { useTheme } from './ThemeContext';
 
 const isWeb = Platform.OS === 'web';
 
 export default function LoginScreen({ navigation }) {
+  const { theme, isDark } = useTheme();
+  const colors = theme.colors;
   const { loginWithGoogle, loginWithApple, loginWithKakao } = useAuth();
   const [loading, setLoading] = useState(null); // 'google', 'apple', 'kakao', or null
 
@@ -50,9 +53,9 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* 상단 로고 영역 - 파란 배경 */}
       <View style={styles.logoSection}>
         <View style={styles.logoContainer}>
@@ -62,39 +65,39 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.tagline}>AI가 분석하는 스마트 투자</Text>
       </View>
 
-      {/* 하단 로그인 영역 - 흰 배경 */}
-      <View style={styles.loginSection}>
-        <Text style={styles.welcomeTitle}>환영합니다</Text>
-        <Text style={styles.welcomeSubtitle}>
+      {/* 하단 로그인 영역 */}
+      <View style={[styles.loginSection, { backgroundColor: colors.background }]}>
+        <Text style={[styles.welcomeTitle, { color: colors.text }]}>환영합니다</Text>
+        <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>
           로그인하고 AI 투자 분석을 시작하세요
         </Text>
 
         {/* 기능 소개 */}
         <View style={styles.featuresContainer}>
           <View style={styles.featureItem}>
-            <View style={styles.featureIcon}>
-              <Ionicons name="analytics-outline" size={20} color="#3B82F6" />
+            <View style={[styles.featureIcon, { backgroundColor: colors.primaryBg }]}>
+              <Ionicons name="analytics-outline" size={20} color={colors.primary} />
             </View>
-            <Text style={styles.featureText}>AI 기반 차트 분석</Text>
+            <Text style={[styles.featureText, { color: colors.text }]}>AI 기반 차트 분석</Text>
           </View>
           <View style={styles.featureItem}>
-            <View style={styles.featureIcon}>
-              <Ionicons name="notifications-outline" size={20} color="#3B82F6" />
+            <View style={[styles.featureIcon, { backgroundColor: colors.primaryBg }]}>
+              <Ionicons name="notifications-outline" size={20} color={colors.primary} />
             </View>
-            <Text style={styles.featureText}>매일 아침 분석 리포트</Text>
+            <Text style={[styles.featureText, { color: colors.text }]}>매일 아침 분석 리포트</Text>
           </View>
           <View style={styles.featureItem}>
-            <View style={styles.featureIcon}>
-              <Ionicons name="speedometer-outline" size={20} color="#3B82F6" />
+            <View style={[styles.featureIcon, { backgroundColor: colors.primaryBg }]}>
+              <Ionicons name="speedometer-outline" size={20} color={colors.primary} />
             </View>
-            <Text style={styles.featureText}>0~100 점수로 쉬운 판단</Text>
+            <Text style={[styles.featureText, { color: colors.text }]}>0~100 점수로 쉬운 판단</Text>
           </View>
         </View>
 
         {/* 로그인 버튼들 */}
         <View style={styles.loginButtons}>
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={[styles.primaryButton, { backgroundColor: colors.primary }]}
             onPress={handleGoogleLogin}
             disabled={loading !== null}
           >
@@ -111,16 +114,16 @@ export default function LoginScreen({ navigation }) {
           {/* Apple 로그인 - iOS 앱에서만 표시 */}
           {!isWeb && (
             <TouchableOpacity
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={handleAppleLogin}
               disabled={loading !== null}
             >
               {loading === 'apple' ? (
-                <ActivityIndicator color="#000000" />
+                <ActivityIndicator color={colors.text} />
               ) : (
                 <>
-                  <Ionicons name="logo-apple" size={20} color="#000000" />
-                  <Text style={styles.secondaryButtonText}>Apple로 계속하기</Text>
+                  <Ionicons name="logo-apple" size={20} color={colors.text} />
+                  <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Apple로 계속하기</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -143,7 +146,7 @@ export default function LoginScreen({ navigation }) {
         </View>
 
         {/* 하단 텍스트 */}
-        <Text style={styles.disclaimer}>
+        <Text style={[styles.disclaimer, { color: colors.textTertiary }]}>
           계속 진행하면 서비스 이용약관 및{'\n'}개인정보처리방침에 동의하는 것으로 간주됩니다.
         </Text>
       </View>

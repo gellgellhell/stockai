@@ -17,11 +17,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ONBOARDING_SCREENS } from '../config/onboardingConfig';
 import { useOnboarding } from '../OnboardingContext';
+import { useTheme } from '../ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
 // 개별 온보딩 페이지
-const OnboardingPage = ({ item, index }) => {
+const OnboardingPage = ({ item, index, colors }) => {
   return (
     <View style={[styles.page, { width }]}>
       {/* 아이콘 영역 */}
@@ -31,16 +32,16 @@ const OnboardingPage = ({ item, index }) => {
 
       {/* 텍스트 영역 */}
       <View style={styles.textContainer}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description}>{item.description}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+        <Text style={[styles.description, { color: colors.textSecondary }]}>{item.description}</Text>
 
         {/* 기능 리스트 */}
         {item.features && (
           <View style={styles.featureList}>
             {item.features.map((feature, idx) => (
-              <View key={idx} style={styles.featureItem}>
+              <View key={idx} style={[styles.featureItem, { backgroundColor: colors.surfaceSecondary }]}>
                 <Ionicons name="checkmark-circle" size={20} color={item.color} />
-                <Text style={styles.featureText}>{feature}</Text>
+                <Text style={[styles.featureText, { color: colors.text }]}>{feature}</Text>
               </View>
             ))}
           </View>
@@ -50,9 +51,9 @@ const OnboardingPage = ({ item, index }) => {
         {item.plans && (
           <View style={styles.planList}>
             {item.plans.map((plan, idx) => (
-              <View key={idx} style={styles.planItem}>
+              <View key={idx} style={[styles.planItem, { backgroundColor: colors.surfaceSecondary }]}>
                 <Text style={[styles.planName, { color: item.color }]}>{plan.name}</Text>
-                <Text style={styles.planDescription}>{plan.description}</Text>
+                <Text style={[styles.planDescription, { color: colors.textSecondary }]}>{plan.description}</Text>
               </View>
             ))}
           </View>
@@ -63,7 +64,7 @@ const OnboardingPage = ({ item, index }) => {
 };
 
 // 페이지 인디케이터
-const PageIndicator = ({ currentIndex, total, color }) => {
+const PageIndicator = ({ currentIndex, total, color, colors }) => {
   return (
     <View style={styles.indicatorContainer}>
       {Array.from({ length: total }).map((_, index) => (
@@ -71,6 +72,7 @@ const PageIndicator = ({ currentIndex, total, color }) => {
           key={index}
           style={[
             styles.indicator,
+            { backgroundColor: colors.border },
             index === currentIndex && [styles.indicatorActive, { backgroundColor: color }],
           ]}
         />
@@ -80,6 +82,8 @@ const PageIndicator = ({ currentIndex, total, color }) => {
 };
 
 const OnboardingScreen = () => {
+  const { theme } = useTheme();
+  const colors = theme.colors;
   const { completeOnboarding } = useOnboarding();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
@@ -133,18 +137,18 @@ const OnboardingScreen = () => {
   }, [completeOnboarding]);
 
   const renderItem = useCallback(({ item, index }) => (
-    <OnboardingPage item={item} index={index} />
-  ), []);
+    <OnboardingPage item={item} index={index} colors={colors} />
+  ), [colors]);
 
   const keyExtractor = useCallback((item) => item.id, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 건너뛰기 버튼 */}
       <View style={styles.header}>
         {currentIndex > 0 ? (
           <TouchableOpacity style={styles.headerButton} onPress={handlePrev}>
-            <Ionicons name="arrow-back" size={24} color="#6B7280" />
+            <Ionicons name="arrow-back" size={24} color={colors.textSecondary} />
           </TouchableOpacity>
         ) : (
           <View style={styles.headerButton} />
@@ -152,7 +156,7 @@ const OnboardingScreen = () => {
 
         {!isLastPage && (
           <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipText}>건너뛰기</Text>
+            <Text style={[styles.skipText, { color: colors.textSecondary }]}>건너뛰기</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -179,6 +183,7 @@ const OnboardingScreen = () => {
           currentIndex={currentIndex}
           total={ONBOARDING_SCREENS.length}
           color={currentScreen.color}
+          colors={colors}
         />
 
         <TouchableOpacity

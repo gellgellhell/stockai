@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePayment } from './PaymentContext';
+import { useTheme } from './ThemeContext';
 
 // 분석 레벨 설명
 const ANALYSIS_LEVELS = [
@@ -41,6 +42,8 @@ const ANALYSIS_LEVELS = [
 ];
 
 export default function SubscriptionScreen() {
+  const { theme } = useTheme();
+  const colors = theme.colors;
   const {
     products,
     subscription,
@@ -133,28 +136,28 @@ export default function SubscriptionScreen() {
   const currentPlanInfo = getCurrentPlanInfo();
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>플랜 선택</Text>
-        <Text style={styles.headerSubtitle}>더 정확한 AI 분석을 이용해보세요</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>플랜 선택</Text>
+        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>더 정확한 AI 분석을 이용해보세요</Text>
       </View>
 
       {/* 현재 구독 상태 */}
       {currentPlanInfo && (
-        <View style={styles.currentPlanBanner}>
+        <View style={[styles.currentPlanBanner, { backgroundColor: colors.primaryBg, borderColor: colors.primaryLight }]}>
           <View style={styles.currentPlanHeader}>
             <View style={[styles.currentPlanBadge, { backgroundColor: currentPlanInfo.color }]}>
               <Text style={styles.currentPlanBadgeText}>{currentPlanInfo.nameKr}</Text>
             </View>
-            <Text style={styles.currentPlanLabel}>현재 구독 중</Text>
+            <Text style={[styles.currentPlanLabel, { color: colors.primary }]}>현재 구독 중</Text>
           </View>
           {subscription.expiresAt && (
-            <Text style={styles.currentPlanExpiry}>
+            <Text style={[styles.currentPlanExpiry, { color: colors.textSecondary }]}>
               만료일: {new Date(subscription.expiresAt).toLocaleDateString('ko-KR')}
             </Text>
           )}
           {subscription.status === 'grace_period' && (
-            <Text style={styles.gracePeriodWarning}>
+            <Text style={[styles.gracePeriodWarning, { color: colors.error }]}>
               결제 갱신이 필요합니다. 곧 만료됩니다.
             </Text>
           )}
@@ -163,39 +166,39 @@ export default function SubscriptionScreen() {
 
       {/* 결제 주기 토글 */}
       <View style={styles.billingToggle}>
-        <Text style={[styles.billingOption, !isYearly && styles.billingOptionActive]}>
+        <Text style={[styles.billingOption, { color: colors.textTertiary }, !isYearly && { color: colors.text, fontWeight: '600' }]}>
           월간 결제
         </Text>
         <Switch
           value={isYearly}
           onValueChange={setIsYearly}
-          trackColor={{ false: '#D1D5DB', true: '#3B82F6' }}
+          trackColor={{ false: colors.border, true: colors.primary }}
           thumbColor="#fff"
         />
         <View style={styles.billingYearlyContainer}>
-          <Text style={[styles.billingOption, isYearly && styles.billingOptionActive]}>
+          <Text style={[styles.billingOption, { color: colors.textTertiary }, isYearly && { color: colors.text, fontWeight: '600' }]}>
             연간 결제
           </Text>
-          <View style={styles.discountBadge}>
-            <Text style={styles.discountText}>17% 할인</Text>
+          <View style={[styles.discountBadge, { backgroundColor: colors.successBg }]}>
+            <Text style={[styles.discountText, { color: colors.success }]}>17% 할인</Text>
           </View>
         </View>
       </View>
 
       {/* 분석 레벨 설명 */}
       <View style={styles.levelSection}>
-        <Text style={styles.levelSectionTitle}>분석 등급 안내</Text>
+        <Text style={[styles.levelSectionTitle, { color: colors.textSecondary }]}>분석 등급 안내</Text>
         <View style={styles.levelCards}>
           {ANALYSIS_LEVELS.map((level) => (
-            <View key={level.level} style={styles.levelCard}>
+            <View key={level.level} style={[styles.levelCard, { backgroundColor: colors.card }]}>
               <View style={[styles.levelIcon, { backgroundColor: level.color + '20' }]}>
                 <Ionicons name={level.icon} size={20} color={level.color} />
               </View>
-              <Text style={styles.levelName}>{level.name}</Text>
+              <Text style={[styles.levelName, { color: colors.text }]}>{level.name}</Text>
               <Text style={[styles.levelScoreType, { color: level.color }]}>
                 {level.scoreType}
               </Text>
-              <Text style={styles.levelDescription}>{level.description}</Text>
+              <Text style={[styles.levelDescription, { color: colors.textTertiary }]}>{level.description}</Text>
             </View>
           ))}
         </View>
@@ -203,32 +206,32 @@ export default function SubscriptionScreen() {
 
       {/* Free 플랜 */}
       <TouchableOpacity
-        style={[styles.planCard, selectedPlan === 'free' && styles.planCardSelected]}
+        style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.border }, selectedPlan === 'free' && { borderColor: colors.primary }]}
         onPress={() => setSelectedPlan('free')}
       >
         <View style={styles.planHeader}>
           <View>
-            <Text style={styles.planName}>Free</Text>
+            <Text style={[styles.planName, { color: colors.text }]}>Free</Text>
             <View style={styles.priceRow}>
-              <Text style={styles.planPrice}>무료</Text>
+              <Text style={[styles.planPrice, { color: colors.text }]}>무료</Text>
             </View>
           </View>
-          <View style={[styles.radioButton, selectedPlan === 'free' && styles.radioButtonSelected]}>
-            {selectedPlan === 'free' && <View style={styles.radioInner} />}
+          <View style={[styles.radioButton, { borderColor: colors.border }, selectedPlan === 'free' && { borderColor: colors.primary }]}>
+            {selectedPlan === 'free' && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
           </View>
         </View>
         <View style={styles.featuresContainer}>
-          <FeatureItem text="Level 1 분석 무제한" included />
-          <FeatureItem text="Level 2 분석 5회/일" included />
-          <FeatureItem text="새로고침 10회/일" included />
-          <FeatureItem text="광고 지원" included />
+          <FeatureItem text="Level 1 분석 무제한" included colors={colors} />
+          <FeatureItem text="Level 2 분석 5회/일" included colors={colors} />
+          <FeatureItem text="새로고침 10회/일" included colors={colors} />
+          <FeatureItem text="광고 지원" included colors={colors} />
         </View>
         <TouchableOpacity
-          style={[styles.subscribeButton, currentPlan === 'free' && styles.currentPlanButton]}
+          style={[styles.subscribeButton, { backgroundColor: colors.surfaceSecondary }, currentPlan === 'free' && { backgroundColor: colors.border }]}
           onPress={() => handleSubscribe('free')}
           disabled={currentPlan === 'free'}
         >
-          <Text style={[styles.subscribeButtonText, currentPlan === 'free' && styles.currentPlanButtonText]}>
+          <Text style={[styles.subscribeButtonText, { color: colors.textSecondary }, currentPlan === 'free' && { color: colors.textTertiary }]}>
             {currentPlan === 'free' ? '현재 플랜' : '무료로 시작'}
           </Text>
         </TouchableOpacity>
@@ -243,11 +246,11 @@ export default function SubscriptionScreen() {
         return (
           <TouchableOpacity
             key={plan.id}
-            style={[styles.planCard, isSelected && styles.planCardSelected]}
+            style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.border }, isSelected && { borderColor: colors.primary }]}
             onPress={() => setSelectedPlan(plan.id)}
           >
             {plan.recommended && (
-              <View style={styles.popularBadge}>
+              <View style={[styles.popularBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.popularText}>추천</Text>
               </View>
             )}
@@ -255,7 +258,7 @@ export default function SubscriptionScreen() {
             <View style={styles.planHeader}>
               <View>
                 <View style={styles.planNameRow}>
-                  <Text style={styles.planName}>{plan.name}</Text>
+                  <Text style={[styles.planName, { color: colors.text }]}>{plan.name}</Text>
                   <View style={[styles.levelBadge, { backgroundColor: plan.color + '20' }]}>
                     <Text style={[styles.levelBadgeText, { color: plan.color }]}>
                       {plan.nameKr}
@@ -263,44 +266,46 @@ export default function SubscriptionScreen() {
                   </View>
                 </View>
                 <View style={styles.priceRow}>
-                  <Text style={[styles.planPrice, isSelected && styles.planPriceSelected]}>
+                  <Text style={[styles.planPrice, { color: colors.text }, isSelected && { color: colors.primary }]}>
                     {price?.price || `₩${(isYearly ? plan.yearlyPrice : plan.monthlyPrice)?.toLocaleString()}`}
                   </Text>
-                  <Text style={styles.priceSubtext}>/{isYearly ? '년' : '월'}</Text>
+                  <Text style={[styles.priceSubtext, { color: colors.textSecondary }]}>/{isYearly ? '년' : '월'}</Text>
                 </View>
                 {isYearly && (
-                  <Text style={styles.monthlyEquivalent}>
+                  <Text style={[styles.monthlyEquivalent, { color: colors.success }]}>
                     월 ₩{Math.round((plan.yearlyPrice || 0) / 12).toLocaleString()} 상당
                   </Text>
                 )}
               </View>
-              <View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
-                {isSelected && <View style={styles.radioInner} />}
+              <View style={[styles.radioButton, { borderColor: colors.border }, isSelected && { borderColor: colors.primary }]}>
+                {isSelected && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
               </View>
             </View>
 
             <View style={styles.featuresContainer}>
               {plan.features?.map((feature, index) => (
-                <FeatureItem key={index} text={feature} included />
+                <FeatureItem key={index} text={feature} included colors={colors} />
               ))}
             </View>
 
             <TouchableOpacity
               style={[
                 styles.subscribeButton,
-                isSelected && styles.subscribeButtonSelected,
-                isCurrent && styles.currentPlanButton,
+                { backgroundColor: colors.surfaceSecondary },
+                isSelected && { backgroundColor: colors.primary },
+                isCurrent && { backgroundColor: colors.border },
               ]}
               onPress={() => handleSubscribe(plan.id)}
               disabled={purchasing || isCurrent}
             >
               {purchasing && isSelected ? (
-                <ActivityIndicator color={isSelected ? '#fff' : '#6B7280'} />
+                <ActivityIndicator color={isSelected ? '#fff' : colors.textSecondary} />
               ) : (
                 <Text style={[
                   styles.subscribeButtonText,
+                  { color: colors.textSecondary },
                   isSelected && styles.subscribeButtonTextSelected,
-                  isCurrent && styles.currentPlanButtonText,
+                  isCurrent && { color: colors.textTertiary },
                 ]}>
                   {isCurrent ? '현재 플랜' : '구독하기'}
                 </Text>
@@ -317,25 +322,25 @@ export default function SubscriptionScreen() {
         disabled={restoring}
       >
         {restoring ? (
-          <ActivityIndicator color="#3B82F6" />
+          <ActivityIndicator color={colors.primary} />
         ) : (
           <>
-            <Ionicons name="refresh" size={18} color="#3B82F6" />
-            <Text style={styles.restoreButtonText}>이전 구매 복원</Text>
+            <Ionicons name="refresh" size={18} color={colors.primary} />
+            <Text style={[styles.restoreButtonText, { color: colors.primary }]}>이전 구매 복원</Text>
           </>
         )}
       </TouchableOpacity>
 
       <View style={styles.policyContainer}>
-        <Ionicons name="shield-checkmark" size={18} color="#10B981" />
-        <Text style={styles.policyText}>7일 무료 체험 후 결제 • 언제든지 취소 가능</Text>
+        <Ionicons name="shield-checkmark" size={18} color={colors.success} />
+        <Text style={[styles.policyText, { color: colors.textSecondary }]}>7일 무료 체험 후 결제 • 언제든지 취소 가능</Text>
       </View>
 
       <View style={styles.noteContainer}>
-        <Text style={styles.noteText}>
+        <Text style={[styles.noteText, { color: colors.textTertiary }]}>
           구독은 앱 스토어 설정에서 관리할 수 있습니다.
         </Text>
-        <Text style={styles.noteText}>
+        <Text style={[styles.noteText, { color: colors.textTertiary }]}>
           구독은 현재 기간이 끝나기 24시간 전에 자동 갱신됩니다.
         </Text>
       </View>
@@ -346,17 +351,18 @@ export default function SubscriptionScreen() {
 }
 
 // 기능 항목 컴포넌트
-const FeatureItem = ({ text, included, highlight }) => (
+const FeatureItem = ({ text, included, highlight, colors }) => (
   <View style={styles.featureItem}>
     <Ionicons
       name={included ? 'checkmark-circle' : 'close-circle'}
       size={18}
-      color={included ? (highlight ? '#3B82F6' : '#10B981') : '#D1D5DB'}
+      color={included ? (highlight ? (colors?.primary || '#3B82F6') : (colors?.success || '#10B981')) : (colors?.border || '#D1D5DB')}
     />
     <Text style={[
       styles.featureText,
-      !included && styles.featureTextDisabled,
-      highlight && styles.featureTextHighlight
+      { color: colors?.text || '#374151' },
+      !included && { color: colors?.textTertiary || '#9CA3AF' },
+      highlight && { fontWeight: '600', color: colors?.primary || '#3B82F6' }
     ]}>
       {text}
     </Text>

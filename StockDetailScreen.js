@@ -8,6 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from './ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +26,8 @@ const getScoreLabel = (score) => {
 };
 
 export default function StockDetailScreen({ route }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
   const { stock } = route.params;
   const [selectedPeriod, setSelectedPeriod] = useState('1D');
   const [isFavorite, setIsFavorite] = useState(true);
@@ -45,49 +48,49 @@ export default function StockDetailScreen({ route }) {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       {/* 상단 가격 정보 */}
-      <View style={styles.priceCard}>
+      <View style={[styles.priceCard, { backgroundColor: colors.card }]}>
         <View style={styles.priceHeader}>
           <View style={styles.stockInfo}>
-            <View style={[styles.stockIcon, { 
-              backgroundColor: stock.type === 'crypto' ? '#3B82F6' : '#10B981' 
+            <View style={[styles.stockIcon, {
+              backgroundColor: stock.type === 'crypto' ? colors.primary : colors.success
             }]}>
               <Text style={styles.stockIconText}>{stock.symbol.charAt(0)}</Text>
             </View>
             <View>
-              <Text style={styles.stockSymbol}>{stock.symbol}</Text>
-              <Text style={styles.stockName}>{stock.name}</Text>
+              <Text style={[styles.stockSymbol, { color: colors.text }]}>{stock.symbol}</Text>
+              <Text style={[styles.stockName, { color: colors.textSecondary }]}>{stock.name}</Text>
             </View>
           </View>
           <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
-            <Ionicons 
-              name={isFavorite ? 'star' : 'star-outline'} 
-              size={24} 
-              color={isFavorite ? '#F59E0B' : '#9CA3AF'} 
+            <Ionicons
+              name={isFavorite ? 'star' : 'star-outline'}
+              size={24}
+              color={isFavorite ? colors.warning : colors.textTertiary}
             />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.currentPrice}>{stock.price.toLocaleString()} USD</Text>
+        <Text style={[styles.currentPrice, { color: colors.text }]}>{stock.price.toLocaleString()} USD</Text>
         <View style={styles.changeRow}>
-          <Text style={[styles.changeText, { color: stock.change >= 0 ? '#10B981' : '#EF4444' }]}>
+          <Text style={[styles.changeText, { color: stock.change >= 0 ? colors.success : colors.error }]}>
             {stock.change >= 0 ? '+' : ''}{stock.change}%
           </Text>
-          <Text style={styles.changeLabel}>최고 연 0.00%</Text>
+          <Text style={[styles.changeLabel, { color: colors.textTertiary }]}>최고 연 0.00%</Text>
         </View>
       </View>
 
       {/* 차트 영역 */}
-      <View style={styles.chartCard}>
-        <View style={styles.periodSelector}>
+      <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.periodSelector, { backgroundColor: colors.surfaceSecondary }]}>
           {periods.map((period) => (
             <TouchableOpacity
               key={period}
-              style={[styles.periodButton, selectedPeriod === period && styles.periodButtonActive]}
+              style={[styles.periodButton, selectedPeriod === period && [styles.periodButtonActive, { backgroundColor: colors.card }]]}
               onPress={() => setSelectedPeriod(period)}
             >
-              <Text style={[styles.periodText, selectedPeriod === period && styles.periodTextActive]}>
+              <Text style={[styles.periodText, { color: colors.textSecondary }, selectedPeriod === period && { color: colors.primary }]}>
                 {period}
               </Text>
             </TouchableOpacity>
@@ -96,29 +99,29 @@ export default function StockDetailScreen({ route }) {
 
         {/* 차트 플레이스홀더 */}
         <View style={styles.chartPlaceholder}>
-          <View style={styles.chartLine} />
-          <View style={styles.chartArea} />
+          <View style={[styles.chartLine, { backgroundColor: colors.primary }]} />
+          <View style={[styles.chartArea, { backgroundColor: colors.primaryBg }]} />
         </View>
 
         <View style={styles.chartLabels}>
-          <Text style={styles.chartLabel}>Aug</Text>
-          <Text style={styles.chartLabel}>Oct</Text>
-          <Text style={styles.chartLabel}>Dec</Text>
-          <Text style={styles.chartLabel}>Feb</Text>
-          <Text style={styles.chartLabel}>Apr</Text>
-          <Text style={styles.chartLabel}>Jun</Text>
+          <Text style={[styles.chartLabel, { color: colors.textTertiary }]}>Aug</Text>
+          <Text style={[styles.chartLabel, { color: colors.textTertiary }]}>Oct</Text>
+          <Text style={[styles.chartLabel, { color: colors.textTertiary }]}>Dec</Text>
+          <Text style={[styles.chartLabel, { color: colors.textTertiary }]}>Feb</Text>
+          <Text style={[styles.chartLabel, { color: colors.textTertiary }]}>Apr</Text>
+          <Text style={[styles.chartLabel, { color: colors.textTertiary }]}>Jun</Text>
         </View>
       </View>
 
       {/* AI 분석 점수 */}
-      <View style={styles.scoreCard}>
+      <View style={[styles.scoreCard, { backgroundColor: colors.card }]}>
         <View style={styles.scoreHeader}>
-          <Text style={styles.scoreTitle}>AI 분석 점수</Text>
+          <Text style={[styles.scoreTitle, { color: colors.text }]}>AI 분석 점수</Text>
           <View style={[styles.mainScoreBadge, { backgroundColor: getScoreColor(stock.score) }]}>
             <Text style={styles.mainScoreText}>{stock.score}</Text>
           </View>
         </View>
-        
+
         <View style={[styles.scoreGradeBadge, { backgroundColor: getScoreColor(stock.score) + '15' }]}>
           <Text style={[styles.scoreGradeText, { color: getScoreColor(stock.score) }]}>
             {getScoreLabel(stock.score)}
@@ -135,15 +138,15 @@ export default function StockDetailScreen({ route }) {
           ].map((item, index) => (
             <View key={index} style={styles.subScoreItem}>
               <View style={styles.subScoreHeader}>
-                <Text style={styles.subScoreLabel}>{item.label}</Text>
+                <Text style={[styles.subScoreLabel, { color: colors.textSecondary }]}>{item.label}</Text>
                 <Text style={[styles.subScoreValue, { color: getScoreColor(item.score) }]}>
                   {item.score}
                 </Text>
               </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { 
-                  width: `${item.score}%`, 
-                  backgroundColor: getScoreColor(item.score) 
+              <View style={[styles.progressBar, { backgroundColor: colors.surfaceSecondary }]}>
+                <View style={[styles.progressFill, {
+                  width: `${item.score}%`,
+                  backgroundColor: getScoreColor(item.score)
                 }]} />
               </View>
             </View>
@@ -152,23 +155,23 @@ export default function StockDetailScreen({ route }) {
       </View>
 
       {/* 주요 시그널 */}
-      <View style={styles.signalsCard}>
-        <Text style={styles.signalsTitle}>주요 시그널</Text>
+      <View style={[styles.signalsCard, { backgroundColor: colors.card }]}>
+        <Text style={[styles.signalsTitle, { color: colors.text }]}>주요 시그널</Text>
         {analysisData.signals.map((signal, index) => (
-          <View key={index} style={styles.signalItem}>
+          <View key={index} style={[styles.signalItem, { borderBottomColor: colors.border }]}>
             <View style={[styles.signalDot, {
-              backgroundColor: signal.type === 'positive' ? '#10B981' : 
-                              signal.type === 'negative' ? '#EF4444' : '#F59E0B'
+              backgroundColor: signal.type === 'positive' ? colors.success :
+                              signal.type === 'negative' ? colors.error : colors.warning
             }]} />
-            <Text style={styles.signalText}>{signal.text}</Text>
+            <Text style={[styles.signalText, { color: colors.text }]}>{signal.text}</Text>
           </View>
         ))}
       </View>
 
       {/* 면책 조항 */}
-      <View style={styles.disclaimer}>
-        <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
-        <Text style={styles.disclaimerText}>
+      <View style={[styles.disclaimer, { backgroundColor: colors.surfaceSecondary }]}>
+        <Ionicons name="information-circle-outline" size={16} color={colors.textTertiary} />
+        <Text style={[styles.disclaimerText, { color: colors.textTertiary }]}>
           이 정보는 투자 조언이 아니며, 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.
         </Text>
       </View>

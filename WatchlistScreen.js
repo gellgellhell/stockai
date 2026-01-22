@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWatchlist } from './WatchlistContext';
+import { useTheme } from './ThemeContext';
 
 // 그룹 색상 옵션
 const GROUP_COLORS = [
@@ -26,6 +27,8 @@ const GROUP_COLORS = [
 ];
 
 export default function WatchlistScreen({ navigation }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
   const {
     watchlist,
     groups,
@@ -139,18 +142,18 @@ export default function WatchlistScreen({ navigation }) {
 
   // 종목 카드 렌더링
   const renderStockItem = useCallback(({ item }) => {
-    const changeColor = (item.last_change_percent || 0) >= 0 ? '#10B981' : '#EF4444';
+    const changeColor = (item.last_change_percent || 0) >= 0 ? colors.success : colors.error;
 
     return (
       <TouchableOpacity
-        style={styles.stockCard}
+        style={[styles.stockCard, { backgroundColor: colors.card }]}
         onPress={() => handleStockPress(item)}
         onLongPress={() => handleRemoveStock(item.symbol, item.name)}
       >
         <View style={styles.stockMain}>
           <View style={styles.stockInfo}>
-            <Text style={styles.stockSymbol}>{item.symbol}</Text>
-            <Text style={styles.stockName} numberOfLines={1}>
+            <Text style={[styles.stockSymbol, { color: colors.text }]}>{item.symbol}</Text>
+            <Text style={[styles.stockName, { color: colors.textSecondary }]} numberOfLines={1}>
               {item.name || item.symbol}
             </Text>
             {item.group_name && (
@@ -165,7 +168,7 @@ export default function WatchlistScreen({ navigation }) {
           <View style={styles.stockPrice}>
             {item.last_price ? (
               <>
-                <Text style={styles.priceText}>
+                <Text style={[styles.priceText, { color: colors.text }]}>
                   ${item.last_price?.toLocaleString()}
                 </Text>
                 <Text style={[styles.changeText, { color: changeColor }]}>
@@ -174,15 +177,15 @@ export default function WatchlistScreen({ navigation }) {
                 </Text>
               </>
             ) : (
-              <Text style={styles.noPriceText}>가격 정보 없음</Text>
+              <Text style={[styles.noPriceText, { color: colors.textTertiary }]}>가격 정보 없음</Text>
             )}
           </View>
         </View>
 
         {item.memo && (
-          <View style={styles.memoContainer}>
-            <Ionicons name="document-text-outline" size={14} color="#6B7280" />
-            <Text style={styles.memoText} numberOfLines={1}>
+          <View style={[styles.memoContainer, { borderTopColor: colors.border }]}>
+            <Ionicons name="document-text-outline" size={14} color={colors.textSecondary} />
+            <Text style={[styles.memoText, { color: colors.textSecondary }]} numberOfLines={1}>
               {item.memo}
             </Text>
           </View>
@@ -193,29 +196,29 @@ export default function WatchlistScreen({ navigation }) {
             style={styles.actionButton}
             onPress={() => handleEditMemo(item)}
           >
-            <Ionicons name="create-outline" size={18} color="#6B7280" />
+            <Ionicons name="create-outline" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => handleRemoveStock(item.symbol, item.name)}
           >
-            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+            <Ionicons name="trash-outline" size={18} color={colors.error} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
-  }, [handleStockPress, handleRemoveStock, handleEditMemo]);
+  }, [handleStockPress, handleRemoveStock, handleEditMemo, colors]);
 
   // 빈 목록
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="star-outline" size={64} color="#D1D5DB" />
-      <Text style={styles.emptyTitle}>관심종목이 없습니다</Text>
-      <Text style={styles.emptySubtitle}>
+      <Ionicons name="star-outline" size={64} color={colors.textTertiary} />
+      <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>관심종목이 없습니다</Text>
+      <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>
         종목 검색에서 관심있는 종목을 추가해보세요
       </Text>
       <TouchableOpacity
-        style={styles.searchButton}
+        style={[styles.searchButton, { backgroundColor: colors.primary }]}
         onPress={() => navigation.navigate('Search')}
       >
         <Ionicons name="search" size={20} color="#fff" />
@@ -225,19 +228,19 @@ export default function WatchlistScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>관심종목</Text>
-        <View style={styles.limitBadge}>
-          <Text style={styles.limitText}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>관심종목</Text>
+        <View style={[styles.limitBadge, { backgroundColor: colors.surfaceSecondary }]}>
+          <Text style={[styles.limitText, { color: colors.textSecondary }]}>
             {limitInfo.current} / {limitInfo.limit === '무제한' ? '∞' : limitInfo.limit}
           </Text>
         </View>
       </View>
 
       {/* 그룹 탭 */}
-      <View style={styles.groupTabs}>
+      <View style={[styles.groupTabs, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -247,7 +250,8 @@ export default function WatchlistScreen({ navigation }) {
             <TouchableOpacity
               style={[
                 styles.groupTab,
-                selectedGroupId === item.id && styles.groupTabActive,
+                { backgroundColor: colors.surfaceSecondary },
+                selectedGroupId === item.id && { backgroundColor: colors.primary },
               ]}
               onPress={() => selectGroup(item.id)}
               onLongPress={() => item.id && handleDeleteGroup(item.id, item.name)}
@@ -258,20 +262,21 @@ export default function WatchlistScreen({ navigation }) {
               <Text
                 style={[
                   styles.groupTabText,
+                  { color: colors.textSecondary },
                   selectedGroupId === item.id && styles.groupTabTextActive,
                 ]}
               >
                 {item.name}
               </Text>
-              <Text style={styles.groupCount}>{item.stock_count || 0}</Text>
+              <Text style={[styles.groupCount, { color: colors.textTertiary }]}>{item.stock_count || 0}</Text>
             </TouchableOpacity>
           )}
           ListFooterComponent={
             <TouchableOpacity
-              style={styles.addGroupButton}
+              style={[styles.addGroupButton, { backgroundColor: colors.primaryBg }]}
               onPress={() => setShowGroupModal(true)}
             >
-              <Ionicons name="add" size={20} color="#3B82F6" />
+              <Ionicons name="add" size={20} color={colors.primary} />
             </TouchableOpacity>
           }
           contentContainerStyle={styles.groupTabsContent}
@@ -286,7 +291,7 @@ export default function WatchlistScreen({ navigation }) {
         contentContainerStyle={watchlist.length === 0 ? styles.emptyList : styles.listContent}
         ListEmptyComponent={renderEmptyList}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
+          <RefreshControl refreshing={loading} onRefresh={handleRefresh} tintColor={colors.primary} />
         }
       />
 
@@ -298,18 +303,19 @@ export default function WatchlistScreen({ navigation }) {
         onRequestClose={() => setShowGroupModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>새 그룹 만들기</Text>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>새 그룹 만들기</Text>
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
               placeholder="그룹 이름"
+              placeholderTextColor={colors.placeholder}
               value={newGroupName}
               onChangeText={setNewGroupName}
               maxLength={20}
             />
 
-            <Text style={styles.colorLabel}>그룹 색상</Text>
+            <Text style={[styles.colorLabel, { color: colors.textSecondary }]}>그룹 색상</Text>
             <View style={styles.colorOptions}>
               {GROUP_COLORS.map((color) => (
                 <TouchableOpacity
@@ -330,13 +336,13 @@ export default function WatchlistScreen({ navigation }) {
 
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.cancelButton, { backgroundColor: colors.surfaceSecondary }]}
                 onPress={() => setShowGroupModal(false)}
               >
-                <Text style={styles.cancelButtonText}>취소</Text>
+                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.confirmButton}
+                style={[styles.confirmButton, { backgroundColor: colors.primary }]}
                 onPress={handleCreateGroup}
               >
                 <Text style={styles.confirmButtonText}>만들기</Text>
@@ -354,15 +360,16 @@ export default function WatchlistScreen({ navigation }) {
         onRequestClose={() => setShowMemoModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>메모 수정</Text>
-            <Text style={styles.modalSubtitle}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>메모 수정</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
               {editingStock?.name || editingStock?.symbol}
             </Text>
 
             <TextInput
-              style={[styles.input, styles.memoInput]}
+              style={[styles.input, styles.memoInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
               placeholder="메모를 입력하세요"
+              placeholderTextColor={colors.placeholder}
               value={memo}
               onChangeText={setMemo}
               multiline
@@ -371,13 +378,13 @@ export default function WatchlistScreen({ navigation }) {
 
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.cancelButton, { backgroundColor: colors.surfaceSecondary }]}
                 onPress={() => setShowMemoModal(false)}
               >
-                <Text style={styles.cancelButtonText}>취소</Text>
+                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.confirmButton}
+                style={[styles.confirmButton, { backgroundColor: colors.primary }]}
                 onPress={handleSaveMemo}
               >
                 <Text style={styles.confirmButtonText}>저장</Text>
