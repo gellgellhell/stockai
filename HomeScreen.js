@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,7 +15,7 @@ import { getCryptoData, getStockData } from './services/marketApi';
 import { useTheme } from './ThemeContext';
 import { useAuth } from './AuthContext';
 import { getQuickScore } from './services/aiAnalysis';
-import { getWatchlist, getWatchlistLimit } from './services/watchlistService';
+import { getWatchlist, getWatchlistLimit, removeFromWatchlist } from './services/watchlistService';
 
 // 임시 AI 점수 생성 (실제로는 AI 분석 결과 사용)
 const generateAIScore = (change) => {
@@ -156,6 +157,44 @@ export default function HomeScreen({ navigation }) {
     }, [selectedTimeframe, user?.uid])
   );
 
+  // 관심종목 삭제 핸들러
+  const handleRemoveStock = useCallback((stock) => {
+    if (!user?.uid) {
+      Alert.alert('알림', '로그인이 필요합니다.');
+      return;
+    }
+
+    Alert.alert(
+      '관심종목 삭제',
+      `${stock.nameKr || stock.name || stock.symbol}을(를) 관심종목에서 삭제하시겠습니까?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await removeFromWatchlist(user.uid, stock.symbol);
+              if (result.success) {
+                // 로컬 상태에서 즉시 제거
+                setStocks(prev => prev.filter(s => s.symbol !== stock.symbol));
+                setWatchlistLimit(prev => ({
+                  ...prev,
+                  current: Math.max(0, prev.current - 1)
+                }));
+              } else {
+                Alert.alert('오류', result.error || '삭제에 실패했습니다.');
+              }
+            } catch (error) {
+              console.error('Remove stock error:', error);
+              Alert.alert('오류', '삭제 중 오류가 발생했습니다.');
+            }
+          },
+        },
+      ]
+    );
+  }, [user?.uid]);
+
   const onRefresh = () => {
     if (refreshCount <= 0) {
       alert('무료 새로고침 횟수를 모두 사용했습니다.\n광고를 시청하거나 구독을 업그레이드하세요.');
@@ -260,41 +299,56 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           {stocks.map((stock, index) => (
-            <TouchableOpacity
+            <View
               key={stock.symbol + index}
               style={[styles.stockCard, { backgroundColor: colors.card }]}
-              onPress={() => navigation.navigate('StockDetail', { stock })}
             >
-              <View style={styles.stockLeft}>
-                <View style={[styles.stockIcon, {
-                  backgroundColor: stock.type === 'crypto' ? colors.primary : colors.success
-                }]}>
-                  <Text style={styles.stockIconText}>{stock.symbol?.charAt(0)}</Text>
+              <TouchableOpacity
+                style={styles.stockCardContent}
+                onPress={() => navigation.navigate('StockDetail', { stock })}
+                onLongPress={() => handleRemoveStock(stock)}
+              >
+                <View style={styles.stockLeft}>
+                  <View style={[styles.stockIcon, {
+                    backgroundColor: stock.type === 'crypto' ? colors.primary : colors.success
+                  }]}>
+                    <Text style={styles.stockIconText}>{stock.symbol?.charAt(0)}</Text>
+                  </View>
+                  <View>
+                    <Text style={[styles.stockSymbol, { color: colors.text }]}>{stock.symbol}</Text>
+                    <Text style={[styles.stockName, { color: colors.textSecondary }]}>{stock.nameKr || stock.name}</Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={[styles.stockSymbol, { color: colors.text }]}>{stock.symbol}</Text>
-                  <Text style={[styles.stockName, { color: colors.textSecondary }]}>{stock.nameKr || stock.name}</Text>
-                </View>
-              </View>
 
-              <View style={styles.stockMiddle}>
-                <Text style={[styles.stockPrice, { color: colors.text }]}>{formatPrice(stock.price, stock.type)}</Text>
-                <Text style={[styles.stockChange, {
-                  color: (stock.change || 0) >= 0 ? colors.success : colors.error
-                }]}>
-                  {(stock.change || 0) >= 0 ? '▲' : '▼'} {Math.abs(stock.change || 0).toFixed(2)}%
-                </Text>
-              </View>
-
-              <View style={styles.scoreContainer}>
-                <View style={[styles.aiScoreBadge, { backgroundColor: getScoreColor(stock.score || 50) }]}>
-                  <Text style={styles.aiScoreText}>{stock.score || 50}</Text>
+                <View style={styles.stockMiddle}>
+                  <Text style={[styles.stockPrice, { color: colors.text }]}>{formatPrice(stock.price, stock.type)}</Text>
+                  <Text style={[styles.stockChange, {
+                    color: (stock.change || 0) >= 0 ? colors.success : colors.error
+                  }]}>
+                    {(stock.change || 0) >= 0 ? '▲' : '▼'} {Math.abs(stock.change || 0).toFixed(2)}%
+                  </Text>
                 </View>
-                <Text style={[styles.scoreTimeframe, { color: colors.textTertiary }]}>
-                  {stock.timeframeLabel || '1D'}
-                </Text>
-              </View>
-            </TouchableOpacity>
+
+                <View style={styles.scoreContainer}>
+                  <View style={[styles.aiScoreBadge, { backgroundColor: getScoreColor(stock.score || 50) }]}>
+                    <Text style={styles.aiScoreText}>{stock.score || 50}</Text>
+                  </View>
+                  <Text style={[styles.scoreTimeframe, { color: colors.textTertiary }]}>
+                    {stock.timeframeLabel || '1D'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* 삭제 버튼 */}
+              {user?.uid && (
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleRemoveStock(stock)}
+                >
+                  <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
           ))}
 
           {/* 종목 추가 버튼 */}
@@ -437,10 +491,11 @@ const styles = StyleSheet.create({
   },
   stockCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 16,
+    paddingLeft: 16,
+    paddingVertical: 12,
+    paddingRight: 8,
     borderRadius: 12,
     marginBottom: 8,
     shadowColor: '#000',
@@ -448,6 +503,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 4,
     elevation: 1,
+  },
+  stockCardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 4,
   },
   stockLeft: {
     flexDirection: 'row',
