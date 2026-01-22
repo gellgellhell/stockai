@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getTopCryptos, getTopUSStocks, getTopKoreanStocks } from './services/marketApi';
+import { useTheme } from './ThemeContext';
 
 // 임시 AI 점수 생성 (실제로는 AI 분석 결과 사용)
 const generateAIScore = (change) => {
@@ -26,6 +27,8 @@ const getScoreColor = (score) => {
 };
 
 export default function TrendingScreen({ navigation }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
   const [selectedCategory, setSelectedCategory] = useState('crypto');
   const [sortBy, setSortBy] = useState('marketCap');
   const [data, setData] = useState([]);
@@ -98,24 +101,32 @@ export default function TrendingScreen({ navigation }) {
 
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={{ marginTop: 12, color: '#6B7280' }}>데이터 로딩 중...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 12, color: colors.textSecondary }}>데이터 로딩 중...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 카테고리 선택 */}
       <View style={styles.periodContainer}>
         {categories.map((category) => (
           <TouchableOpacity
             key={category.key}
-            style={[styles.periodTab, selectedCategory === category.key && styles.periodTabActive]}
+            style={[
+              styles.periodTab,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              selectedCategory === category.key && { backgroundColor: colors.primary, borderColor: colors.primary }
+            ]}
             onPress={() => setSelectedCategory(category.key)}
           >
-            <Text style={[styles.periodText, selectedCategory === category.key && styles.periodTextActive]}>
+            <Text style={[
+              styles.periodText,
+              { color: colors.textSecondary },
+              selectedCategory === category.key && styles.periodTextActive
+            ]}>
               {category.label}
             </Text>
           </TouchableOpacity>
@@ -125,29 +136,41 @@ export default function TrendingScreen({ navigation }) {
       {/* 정렬 기준 */}
       <View style={styles.sortContainer}>
         <TouchableOpacity
-          style={[styles.sortButton, sortBy === 'marketCap' && styles.sortButtonActive]}
+          style={[
+            styles.sortButton,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            sortBy === 'marketCap' && { backgroundColor: colors.primaryBg, borderColor: colors.primary }
+          ]}
           onPress={() => setSortBy('marketCap')}
         >
-          <Ionicons name="trending-up-outline" size={16} color={sortBy === 'marketCap' ? '#3B82F6' : '#6B7280'} />
-          <Text style={[styles.sortText, sortBy === 'marketCap' && styles.sortTextActive]}>
+          <Ionicons name="trending-up-outline" size={16} color={sortBy === 'marketCap' ? colors.primary : colors.textSecondary} />
+          <Text style={[styles.sortText, { color: colors.textSecondary }, sortBy === 'marketCap' && { color: colors.primary }]}>
             시가총액순
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.sortButton, sortBy === 'change' && styles.sortButtonActive]}
+          style={[
+            styles.sortButton,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            sortBy === 'change' && { backgroundColor: colors.primaryBg, borderColor: colors.primary }
+          ]}
           onPress={() => setSortBy('change')}
         >
-          <Ionicons name="pulse-outline" size={16} color={sortBy === 'change' ? '#3B82F6' : '#6B7280'} />
-          <Text style={[styles.sortText, sortBy === 'change' && styles.sortTextActive]}>
+          <Ionicons name="pulse-outline" size={16} color={sortBy === 'change' ? colors.primary : colors.textSecondary} />
+          <Text style={[styles.sortText, { color: colors.textSecondary }, sortBy === 'change' && { color: colors.primary }]}>
             변동률순
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.sortButton, sortBy === 'score' && styles.sortButtonActive]}
+          style={[
+            styles.sortButton,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            sortBy === 'score' && { backgroundColor: colors.primaryBg, borderColor: colors.primary }
+          ]}
           onPress={() => setSortBy('score')}
         >
-          <Ionicons name="star-outline" size={16} color={sortBy === 'score' ? '#3B82F6' : '#6B7280'} />
-          <Text style={[styles.sortText, sortBy === 'score' && styles.sortTextActive]}>
+          <Ionicons name="star-outline" size={16} color={sortBy === 'score' ? colors.primary : colors.textSecondary} />
+          <Text style={[styles.sortText, { color: colors.textSecondary }, sortBy === 'score' && { color: colors.primary }]}>
             AI점수순
           </Text>
         </TouchableOpacity>
@@ -158,32 +181,32 @@ export default function TrendingScreen({ navigation }) {
         style={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
         {currentData.map((item, index) => (
           <TouchableOpacity
             key={item.symbol + item.id}
-            style={styles.stockItem}
+            style={[styles.stockItem, { backgroundColor: colors.card }]}
             onPress={() => navigation.navigate('StockDetail', { stock: item })}
           >
             {/* 순위 */}
-            <View style={[styles.rankBadge, index < 3 && styles.rankBadgeTop]}>
-              <Text style={[styles.rankText, index < 3 && styles.rankTextTop]}>{index + 1}</Text>
+            <View style={[styles.rankBadge, { backgroundColor: colors.surfaceSecondary }, index < 3 && { backgroundColor: colors.primary }]}>
+              <Text style={[styles.rankText, { color: colors.textSecondary }, index < 3 && styles.rankTextTop]}>{index + 1}</Text>
             </View>
 
             {/* 종목 정보 */}
             <View style={[styles.stockIcon, {
-              backgroundColor: item.type === 'crypto' ? '#3B82F6' : '#10B981'
+              backgroundColor: item.type === 'crypto' ? colors.primary : colors.success
             }]}>
               <Text style={styles.stockIconText}>{item.symbol?.charAt(0)}</Text>
             </View>
 
             <View style={styles.stockInfo}>
-              <Text style={styles.stockName}>{item.nameKr || item.name}</Text>
+              <Text style={[styles.stockName, { color: colors.text }]}>{item.nameKr || item.name}</Text>
               <View style={styles.statsRow}>
-                <Text style={styles.priceText}>{formatPrice(item.price, item.type)}</Text>
-                <Text style={[styles.changeText, { color: item.change >= 0 ? '#10B981' : '#EF4444' }]}>
+                <Text style={[styles.priceText, { color: colors.textSecondary }]}>{formatPrice(item.price, item.type)}</Text>
+                <Text style={[styles.changeText, { color: item.change >= 0 ? colors.success : colors.error }]}>
                   {item.change >= 0 ? '▲' : '▼'} {Math.abs(item.change || 0).toFixed(2)}%
                 </Text>
               </View>

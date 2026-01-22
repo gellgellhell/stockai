@@ -12,10 +12,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { searchAll, getTopCryptos, getTopUSStocks, getTopKoreanStocks } from './services/marketApi';
+import { useTheme } from './ThemeContext';
 
 const POPULAR_KEYWORDS = ['BTC', 'ETH', 'NVDA', 'TSLA', 'AAPL', '삼성전자'];
 
 export default function SearchScreen({ navigation }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [recentSearches, setRecentSearches] = useState(['BTC', 'AAPL', 'TSLA']);
@@ -95,18 +98,18 @@ export default function SearchScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* 검색 입력 */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputWrapper}>
-          <Ionicons name="search" size={20} color="#9CA3AF" />
+      <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={[styles.searchInputWrapper, { backgroundColor: colors.surfaceSecondary }]}>
+          <Ionicons name="search" size={20} color={colors.textTertiary} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="종목명 또는 심볼 검색"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={handleSearch}
             autoCapitalize="none"
@@ -114,7 +117,7 @@ export default function SearchScreen({ navigation }) {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => handleSearch('')}>
-              <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           )}
         </View>
@@ -124,17 +127,17 @@ export default function SearchScreen({ navigation }) {
         {/* 검색 중이거나 검색어가 있을 때 */}
         {searchQuery.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>검색 결과 ({searchResults.length})</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>검색 결과 ({searchResults.length})</Text>
             {isSearching ? (
               <View style={styles.loadingState}>
-                <ActivityIndicator size="small" color="#3B82F6" />
-                <Text style={styles.loadingText}>검색 중...</Text>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>검색 중...</Text>
               </View>
             ) : searchResults.length > 0 ? (
               searchResults.map((item, index) => (
                 <TouchableOpacity
                   key={item.symbol + index}
-                  style={styles.resultItem}
+                  style={[styles.resultItem, { backgroundColor: colors.card }]}
                   onPress={() => {
                     addToRecent(item.symbol);
                     navigation.navigate('StockDetail', { stock: { ...item, score: 75, change: 0 } });
@@ -142,24 +145,24 @@ export default function SearchScreen({ navigation }) {
                 >
                   <View style={styles.resultLeft}>
                     <View style={[styles.resultIcon, {
-                      backgroundColor: item.type === 'crypto' ? '#3B82F6' : '#10B981'
+                      backgroundColor: item.type === 'crypto' ? colors.primary : colors.success
                     }]}>
                       <Text style={styles.resultIconText}>{item.symbol?.charAt(0)}</Text>
                     </View>
                     <View>
-                      <Text style={styles.resultSymbol}>{item.symbol}</Text>
-                      <Text style={styles.resultName}>{item.name}</Text>
+                      <Text style={[styles.resultSymbol, { color: colors.text }]}>{item.symbol}</Text>
+                      <Text style={[styles.resultName, { color: colors.textSecondary }]}>{item.name}</Text>
                     </View>
                   </View>
                   <View style={styles.resultRight}>
-                    <Text style={styles.exchangeText}>{item.exchange || item.type}</Text>
+                    <Text style={[styles.exchangeText, { color: colors.textTertiary }]}>{item.exchange || item.type}</Text>
                   </View>
                 </TouchableOpacity>
               ))
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyText}>검색 결과가 없습니다</Text>
+                <Ionicons name="search-outline" size={48} color={colors.textTertiary} />
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>검색 결과가 없습니다</Text>
               </View>
             )}
           </View>
@@ -168,23 +171,23 @@ export default function SearchScreen({ navigation }) {
           <View style={styles.section}>
             <View style={styles.categoryHeader}>
               <TouchableOpacity onPress={() => setSelectedCategory(null)} style={styles.backButton}>
-                <Ionicons name="arrow-back" size={20} color="#3B82F6" />
-                <Text style={styles.backText}>뒤로</Text>
+                <Ionicons name="arrow-back" size={20} color={colors.primary} />
+                <Text style={[styles.backText, { color: colors.primary }]}>뒤로</Text>
               </TouchableOpacity>
-              <Text style={styles.sectionTitle}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {selectedCategory === 'crypto' ? '암호화폐' : selectedCategory === 'us' ? '미국 주식' : '한국 주식'}
               </Text>
             </View>
             {loadingCategory ? (
               <View style={styles.loadingState}>
-                <ActivityIndicator size="large" color="#3B82F6" />
-                <Text style={styles.loadingText}>데이터 로딩 중...</Text>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>데이터 로딩 중...</Text>
               </View>
             ) : (
               categoryData.map((item, index) => (
                 <TouchableOpacity
                   key={item.symbol + index}
-                  style={styles.resultItem}
+                  style={[styles.resultItem, { backgroundColor: colors.card }]}
                   onPress={() => {
                     addToRecent(item.symbol);
                     navigation.navigate('StockDetail', { stock: { ...item, score: 75 } });
@@ -192,18 +195,18 @@ export default function SearchScreen({ navigation }) {
                 >
                   <View style={styles.resultLeft}>
                     <View style={[styles.resultIcon, {
-                      backgroundColor: item.type === 'crypto' ? '#3B82F6' : '#10B981'
+                      backgroundColor: item.type === 'crypto' ? colors.primary : colors.success
                     }]}>
                       <Text style={styles.resultIconText}>{item.symbol?.charAt(0)}</Text>
                     </View>
                     <View>
-                      <Text style={styles.resultSymbol}>{item.symbol}</Text>
-                      <Text style={styles.resultName}>{item.nameKr || item.name}</Text>
+                      <Text style={[styles.resultSymbol, { color: colors.text }]}>{item.symbol}</Text>
+                      <Text style={[styles.resultName, { color: colors.textSecondary }]}>{item.nameKr || item.name}</Text>
                     </View>
                   </View>
                   <View style={styles.resultRight}>
-                    <Text style={styles.priceText}>{formatPrice(item.price, item.type)}</Text>
-                    <Text style={[styles.changeText, { color: (item.change || 0) >= 0 ? '#10B981' : '#EF4444' }]}>
+                    <Text style={[styles.priceText, { color: colors.text }]}>{formatPrice(item.price, item.type)}</Text>
+                    <Text style={[styles.changeText, { color: (item.change || 0) >= 0 ? colors.success : colors.error }]}>
                       {(item.change || 0) >= 0 ? '+' : ''}{(item.change || 0).toFixed(2)}%
                     </Text>
                   </View>
@@ -216,20 +219,20 @@ export default function SearchScreen({ navigation }) {
             {/* 최근 검색어 */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>최근 검색</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>최근 검색</Text>
                 <TouchableOpacity>
-                  <Text style={styles.clearText}>전체 삭제</Text>
+                  <Text style={[styles.clearText, { color: colors.textSecondary }]}>전체 삭제</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.tagsContainer}>
                 {recentSearches.map((keyword, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.tag}
+                    style={[styles.tag, { backgroundColor: colors.card, borderColor: colors.border }]}
                     onPress={() => handleSearch(keyword)}
                   >
-                    <Ionicons name="time-outline" size={14} color="#6B7280" />
-                    <Text style={styles.tagText}>{keyword}</Text>
+                    <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.tagText, { color: colors.text }]}>{keyword}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -237,15 +240,15 @@ export default function SearchScreen({ navigation }) {
 
             {/* 인기 검색어 */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>인기 검색어</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>인기 검색어</Text>
               <View style={styles.tagsContainer}>
                 {POPULAR_KEYWORDS.map((keyword, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={[styles.tag, styles.popularTag]}
+                    style={[styles.tag, { backgroundColor: colors.primaryBg, borderColor: colors.primaryLight }]}
                     onPress={() => handleSearch(keyword)}
                   >
-                    <Text style={styles.popularTagText}>{keyword}</Text>
+                    <Text style={[styles.popularTagText, { color: colors.primary }]}>{keyword}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -253,38 +256,38 @@ export default function SearchScreen({ navigation }) {
 
             {/* 카테고리 */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>카테고리</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>카테고리</Text>
               <View style={styles.categoriesGrid}>
-                <TouchableOpacity style={styles.categoryCard} onPress={() => handleCategoryPress('crypto')}>
-                  <View style={[styles.categoryIcon, { backgroundColor: '#EFF6FF' }]}>
-                    <Ionicons name="logo-bitcoin" size={24} color="#3B82F6" />
+                <TouchableOpacity style={[styles.categoryCard, { backgroundColor: colors.card }]} onPress={() => handleCategoryPress('crypto')}>
+                  <View style={[styles.categoryIcon, { backgroundColor: colors.primaryBg }]}>
+                    <Ionicons name="logo-bitcoin" size={24} color={colors.primary} />
                   </View>
-                  <Text style={styles.categoryName}>암호화폐</Text>
-                  <Text style={styles.categoryCount}>TOP 20</Text>
+                  <Text style={[styles.categoryName, { color: colors.text }]}>암호화폐</Text>
+                  <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>TOP 20</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.categoryCard} onPress={() => handleCategoryPress('us')}>
-                  <View style={[styles.categoryIcon, { backgroundColor: '#ECFDF5' }]}>
-                    <Ionicons name="trending-up" size={24} color="#10B981" />
+                <TouchableOpacity style={[styles.categoryCard, { backgroundColor: colors.card }]} onPress={() => handleCategoryPress('us')}>
+                  <View style={[styles.categoryIcon, { backgroundColor: colors.successBg }]}>
+                    <Ionicons name="trending-up" size={24} color={colors.success} />
                   </View>
-                  <Text style={styles.categoryName}>미국 주식</Text>
-                  <Text style={styles.categoryCount}>TOP 10</Text>
+                  <Text style={[styles.categoryName, { color: colors.text }]}>미국 주식</Text>
+                  <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>TOP 10</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.categoryCard} onPress={() => handleCategoryPress('kr')}>
-                  <View style={[styles.categoryIcon, { backgroundColor: '#FEF3C7' }]}>
-                    <Ionicons name="flag" size={24} color="#F59E0B" />
+                <TouchableOpacity style={[styles.categoryCard, { backgroundColor: colors.card }]} onPress={() => handleCategoryPress('kr')}>
+                  <View style={[styles.categoryIcon, { backgroundColor: colors.warningBg }]}>
+                    <Ionicons name="flag" size={24} color={colors.warning} />
                   </View>
-                  <Text style={styles.categoryName}>한국 주식</Text>
-                  <Text style={styles.categoryCount}>TOP 10</Text>
+                  <Text style={[styles.categoryName, { color: colors.text }]}>한국 주식</Text>
+                  <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>TOP 10</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.categoryCard} onPress={() => navigation.navigate('Trending')}>
-                  <View style={[styles.categoryIcon, { backgroundColor: '#FEE2E2' }]}>
-                    <Ionicons name="flame" size={24} color="#EF4444" />
+                <TouchableOpacity style={[styles.categoryCard, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('Trending')}>
+                  <View style={[styles.categoryIcon, { backgroundColor: colors.errorBg }]}>
+                    <Ionicons name="flame" size={24} color={colors.error} />
                   </View>
-                  <Text style={styles.categoryName}>인기 급상승</Text>
-                  <Text style={styles.categoryCount}>실시간</Text>
+                  <Text style={[styles.categoryName, { color: colors.text }]}>인기 급상승</Text>
+                  <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>실시간</Text>
                 </TouchableOpacity>
               </View>
             </View>

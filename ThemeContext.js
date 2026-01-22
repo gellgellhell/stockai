@@ -137,8 +137,8 @@ export const ThemeProvider = ({ children }) => {
         if (savedTheme !== null) {
           setIsDark(savedTheme === 'dark');
         } else {
-          // 저장된 설정 없으면 시스템 설정 따르기
-          setIsDark(systemColorScheme === 'dark');
+          // 저장된 설정 없으면 라이트 모드 기본값
+          setIsDark(false);
         }
       } catch (error) {
         console.error('Failed to load theme:', error);
