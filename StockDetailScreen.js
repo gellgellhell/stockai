@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
+import { useAuth } from './AuthContext';
 import { getTimeframeComparison } from './services/aiAnalysis';
+import { checkWatchlist, addToWatchlist, removeFromWatchlist } from './services/watchlistService';
 
 const { width } = Dimensions.get('window');
 
@@ -30,9 +33,11 @@ const getScoreLabel = (score) => {
 export default function StockDetailScreen({ route }) {
   const { theme } = useTheme();
   const colors = theme.colors;
+  const { user } = useAuth();
   const { stock } = route.params;
   const [selectedPeriod, setSelectedPeriod] = useState('1D');
-  const [isFavorite, setIsFavorite] = useState(true);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(true);
   const [timeframeScores, setTimeframeScores] = useState(null);
   const [loadingScores, setLoadingScores] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState('mediumTerm'); // shortTerm, mediumTerm, longTerm
@@ -43,6 +48,27 @@ export default function StockDetailScreen({ route }) {
     { key: 'mediumTerm', label: '1D', fullLabel: '1일' },
     { key: 'longTerm', label: '1W', fullLabel: '1주' },
   ];
+
+  // 관심종목 여부 확인
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (!user?.uid) {
+        setFavoriteLoading(false);
+        return;
+      }
+      try {
+        const result = await checkWatchlist(user.uid, stock.symbol);
+        if (result.success) {
+          setIsFavorite(result.data.isInWatchlist);
+        }
+      } catch (error) {
+        console.error('Failed to check watchlist:', error);
+      } finally {
+        setFavoriteLoading(false);
+      }
+    };
+    checkFavoriteStatus();
+  }, [user?.uid, stock.symbol]);
 
   // 타임프레임별 점수 가져오기
   useEffect(() => {
@@ -63,6 +89,47 @@ export default function StockDetailScreen({ route }) {
     };
     fetchTimeframeScores();
   }, [stock.symbol, stock.type]);
+
+  // 관심종목 토글 핸들러
+  const handleToggleFavorite = async () => {
+    if (!user?.uid) {
+      Alert.alert('로그인 필요', '관심종목 기능을 사용하려면 로그인이 필요합니다.');
+      return;
+    }
+
+    setFavoriteLoading(true);
+    try {
+      if (isFavorite) {
+        // 관심종목에서 삭제
+        const result = await removeFromWatchlist(user.uid, stock.symbol);
+        if (result.success) {
+          setIsFavorite(false);
+          Alert.alert('삭제 완료', '관심종목에서 삭제되었습니다.');
+        } else {
+          Alert.alert('오류', result.error || '삭제에 실패했습니다.');
+        }
+      } else {
+        // 관심종목에 추가
+        const result = await addToWatchlist(user.uid, {
+          symbol: stock.symbol,
+          name: stock.name,
+          nameKr: stock.nameKr || stock.name,
+          type: stock.type || 'crypto',
+        });
+        if (result.success) {
+          setIsFavorite(true);
+          Alert.alert('추가 완료', '관심종목에 추가되었습니다.');
+        } else {
+          Alert.alert('오류', result.error || '추가에 실패했습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('Toggle favorite error:', error);
+      Alert.alert('오류', '처리 중 오류가 발생했습니다.');
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
 
   // 현재 선택된 타임프레임의 점수
   const currentTimeframeScore = timeframeScores?.comparison?.[selectedTimeframe]?.score || stock.score || 50;
@@ -97,12 +164,16 @@ export default function StockDetailScreen({ route }) {
               <Text style={[styles.stockName, { color: colors.textSecondary }]}>{stock.name}</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
-            <Ionicons
-              name={isFavorite ? 'star' : 'star-outline'}
-              size={24}
-              color={isFavorite ? colors.warning : colors.textTertiary}
-            />
+          <TouchableOpacity onPress={handleToggleFavorite} disabled={favoriteLoading}>
+            {favoriteLoading ? (
+              <ActivityIndicator size="small" color={colors.warning} />
+            ) : (
+              <Ionicons
+                name={isFavorite ? 'star' : 'star-outline'}
+                size={24}
+                color={isFavorite ? colors.warning : colors.textTertiary}
+              />
+            )}
           </TouchableOpacity>
         </View>
 
