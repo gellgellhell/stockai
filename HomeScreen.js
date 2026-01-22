@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { getCryptoData, getStockData } from './services/marketApi';
 import { useTheme } from './ThemeContext';
+import { useAuth } from './AuthContext';
 import { getQuickScore } from './services/aiAnalysis';
+import { getWatchlist, getWatchlistLimit } from './services/watchlistService';
 
 // 임시 AI 점수 생성 (실제로는 AI 분석 결과 사용)
 const generateAIScore = (change) => {
@@ -45,23 +48,69 @@ const TIMEFRAME_LABELS = {
 export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const colors = theme.colors;
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshCount, setRefreshCount] = useState(5);
   const [selectedTimeframe, setSelectedTimeframe] = useState(DEFAULT_TIMEFRAME);
+  const [watchlistLimit, setWatchlistLimit] = useState({ current: 0, limit: 1 });
 
   const fetchWatchlistData = async () => {
     try {
-      // 기본 관심 종목 (BTC, ETH, AAPL, TSLA)
-      const [cryptos, usStocks] = await Promise.all([
-        getCryptoData(['BTC', 'ETH']),
-        getStockData(['AAPL', 'TSLA']),
-      ]);
+      let watchlistItems = [];
+
+      // 로그인된 경우 백엔드에서 관심종목 가져오기
+      if (user?.uid) {
+        const [watchlistResult, limitResult] = await Promise.all([
+          getWatchlist(user.uid),
+          getWatchlistLimit(user.uid)
+        ]);
+
+        if (watchlistResult.success && watchlistResult.data?.length > 0) {
+          watchlistItems = watchlistResult.data;
+        }
+
+        if (limitResult.success) {
+          setWatchlistLimit({
+            current: limitResult.data.current,
+            limit: limitResult.data.limit
+          });
+        }
+      }
+
+      // 관심종목이 없으면 기본 종목 표시
+      if (watchlistItems.length === 0) {
+        const [cryptos, usStocks] = await Promise.all([
+          getCryptoData(['BTC', 'ETH']),
+          getStockData(['AAPL', 'TSLA']),
+        ]);
+        watchlistItems = [...cryptos, ...usStocks];
+      } else {
+        // 관심종목의 실시간 가격 데이터 가져오기
+        const cryptoSymbols = watchlistItems.filter(i => i.type === 'crypto').map(i => i.symbol);
+        const stockSymbols = watchlistItems.filter(i => i.type === 'stock').map(i => i.symbol);
+
+        const [cryptoPrices, stockPrices] = await Promise.all([
+          cryptoSymbols.length > 0 ? getCryptoData(cryptoSymbols) : [],
+          stockSymbols.length > 0 ? getStockData(stockSymbols) : [],
+        ]);
+
+        // 가격 데이터 병합
+        const priceMap = new Map();
+        [...cryptoPrices, ...stockPrices].forEach(item => {
+          priceMap.set(item.symbol, item);
+        });
+
+        watchlistItems = watchlistItems.map(item => ({
+          ...item,
+          ...(priceMap.get(item.symbol) || {}),
+        }));
+      }
 
       // 백엔드에서 AI 점수 가져오기
       const allData = await Promise.all(
-        [...cryptos, ...usStocks].map(async (item) => {
+        watchlistItems.map(async (item) => {
           try {
             const scoreData = await getQuickScore(
               item.symbol,
@@ -75,7 +124,6 @@ export default function HomeScreen({ navigation }) {
               timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
             };
           } catch (err) {
-            // 에러 시 로컬 점수 사용
             return {
               ...item,
               score: generateAIScore(item.change || 0),
@@ -97,7 +145,16 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     fetchWatchlistData();
-  }, [selectedTimeframe]);
+  }, [selectedTimeframe, user?.uid]);
+
+  // 화면에 다시 포커스될 때 데이터 새로고침
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        fetchWatchlistData();
+      }
+    }, [selectedTimeframe, user?.uid])
+  );
 
   const onRefresh = () => {
     if (refreshCount <= 0) {
@@ -196,7 +253,9 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>내 관심 종목</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Subscription')}>
-              <Text style={[styles.limitText, { color: colors.primary }]}>{stocks.length}/1 종목</Text>
+              <Text style={[styles.limitText, { color: colors.primary }]}>
+                {watchlistLimit.current}/{watchlistLimit.limit} 종목
+              </Text>
             </TouchableOpacity>
           </View>
 

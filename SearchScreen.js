@@ -9,16 +9,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { searchAll, getTopCryptos, getTopUSStocks, getTopKoreanStocks } from './services/marketApi';
 import { useTheme } from './ThemeContext';
+import { useAuth } from './AuthContext';
+import { addToWatchlist, checkWatchlist, getWatchlistLimit } from './services/watchlistService';
 
 const POPULAR_KEYWORDS = ['BTC', 'ETH', 'NVDA', 'TSLA', 'AAPL', '삼성전자'];
 
 export default function SearchScreen({ navigation }) {
   const { theme } = useTheme();
   const colors = theme.colors;
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [recentSearches, setRecentSearches] = useState(['BTC', 'AAPL', 'TSLA']);
@@ -26,7 +30,64 @@ export default function SearchScreen({ navigation }) {
   const [categoryData, setCategoryData] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loadingCategory, setLoadingCategory] = useState(false);
+  const [addingSymbol, setAddingSymbol] = useState(null); // 추가 중인 종목
+  const [addedSymbols, setAddedSymbols] = useState(new Set()); // 이미 추가된 종목
   const searchTimeout = useRef(null);
+
+  // 관심종목 추가 핸들러
+  const handleAddToWatchlist = async (item) => {
+    if (!user) {
+      Alert.alert('로그인 필요', '관심종목을 추가하려면 로그인이 필요합니다.');
+      return;
+    }
+
+    setAddingSymbol(item.symbol);
+
+    try {
+      // 한도 확인
+      const limitResult = await getWatchlistLimit(user.uid);
+      if (limitResult.success && limitResult.data.current >= limitResult.data.limit) {
+        Alert.alert(
+          '한도 초과',
+          `무료 플랜은 최대 ${limitResult.data.limit}개까지 추가할 수 있습니다.\n프리미엄으로 업그레이드하세요.`,
+          [
+            { text: '취소', style: 'cancel' },
+            { text: '업그레이드', onPress: () => navigation.navigate('Subscription') }
+          ]
+        );
+        return;
+      }
+
+      // 이미 추가되어 있는지 확인
+      const checkResult = await checkWatchlist(user.uid, item.symbol);
+      if (checkResult.success && checkResult.data.isInWatchlist) {
+        Alert.alert('알림', '이미 관심종목에 추가된 종목입니다.');
+        setAddedSymbols(prev => new Set([...prev, item.symbol]));
+        return;
+      }
+
+      // 관심종목 추가
+      const result = await addToWatchlist(user.uid, {
+        symbol: item.symbol,
+        name: item.name,
+        nameKr: item.nameKr || item.name,
+        type: item.type || 'crypto',
+        exchange: item.exchange || '',
+      });
+
+      if (result.success) {
+        setAddedSymbols(prev => new Set([...prev, item.symbol]));
+        Alert.alert('추가 완료', `${item.symbol}이(가) 관심종목에 추가되었습니다.`);
+      } else {
+        Alert.alert('오류', result.error || '추가에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Add to watchlist error:', error);
+      Alert.alert('오류', '관심종목 추가 중 오류가 발생했습니다.');
+    } finally {
+      setAddingSymbol(null);
+    }
+  };
 
   const handleSearch = useCallback((query) => {
     setSearchQuery(query);
@@ -135,29 +196,44 @@ export default function SearchScreen({ navigation }) {
               </View>
             ) : searchResults.length > 0 ? (
               searchResults.map((item, index) => (
-                <TouchableOpacity
+                <View
                   key={item.symbol + index}
                   style={[styles.resultItem, { backgroundColor: colors.card }]}
-                  onPress={() => {
-                    addToRecent(item.symbol);
-                    navigation.navigate('StockDetail', { stock: { ...item, score: 75, change: 0 } });
-                  }}
                 >
-                  <View style={styles.resultLeft}>
-                    <View style={[styles.resultIcon, {
-                      backgroundColor: item.type === 'crypto' ? colors.primary : colors.success
-                    }]}>
-                      <Text style={styles.resultIconText}>{item.symbol?.charAt(0)}</Text>
+                  <TouchableOpacity
+                    style={styles.resultContent}
+                    onPress={() => {
+                      addToRecent(item.symbol);
+                      navigation.navigate('StockDetail', { stock: { ...item, score: 75, change: 0 } });
+                    }}
+                  >
+                    <View style={styles.resultLeft}>
+                      <View style={[styles.resultIcon, {
+                        backgroundColor: item.type === 'crypto' ? colors.primary : colors.success
+                      }]}>
+                        <Text style={styles.resultIconText}>{item.symbol?.charAt(0)}</Text>
+                      </View>
+                      <View>
+                        <Text style={[styles.resultSymbol, { color: colors.text }]}>{item.symbol}</Text>
+                        <Text style={[styles.resultName, { color: colors.textSecondary }]}>{item.name}</Text>
+                      </View>
                     </View>
-                    <View>
-                      <Text style={[styles.resultSymbol, { color: colors.text }]}>{item.symbol}</Text>
-                      <Text style={[styles.resultName, { color: colors.textSecondary }]}>{item.name}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.resultRight}>
                     <Text style={[styles.exchangeText, { color: colors.textTertiary }]}>{item.exchange || item.type}</Text>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.addWatchlistButton, addedSymbols.has(item.symbol) && styles.addedButton]}
+                    onPress={() => handleAddToWatchlist(item)}
+                    disabled={addingSymbol === item.symbol || addedSymbols.has(item.symbol)}
+                  >
+                    {addingSymbol === item.symbol ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : addedSymbols.has(item.symbol) ? (
+                      <Ionicons name="checkmark" size={20} color={colors.success} />
+                    ) : (
+                      <Ionicons name="add" size={20} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                </View>
               ))
             ) : (
               <View style={styles.emptyState}>
@@ -185,32 +261,49 @@ export default function SearchScreen({ navigation }) {
               </View>
             ) : (
               categoryData.map((item, index) => (
-                <TouchableOpacity
+                <View
                   key={item.symbol + index}
                   style={[styles.resultItem, { backgroundColor: colors.card }]}
-                  onPress={() => {
-                    addToRecent(item.symbol);
-                    navigation.navigate('StockDetail', { stock: { ...item, score: 75 } });
-                  }}
                 >
-                  <View style={styles.resultLeft}>
-                    <View style={[styles.resultIcon, {
-                      backgroundColor: item.type === 'crypto' ? colors.primary : colors.success
-                    }]}>
-                      <Text style={styles.resultIconText}>{item.symbol?.charAt(0)}</Text>
+                  <TouchableOpacity
+                    style={styles.resultContent}
+                    onPress={() => {
+                      addToRecent(item.symbol);
+                      navigation.navigate('StockDetail', { stock: { ...item, score: 75 } });
+                    }}
+                  >
+                    <View style={styles.resultLeft}>
+                      <View style={[styles.resultIcon, {
+                        backgroundColor: item.type === 'crypto' ? colors.primary : colors.success
+                      }]}>
+                        <Text style={styles.resultIconText}>{item.symbol?.charAt(0)}</Text>
+                      </View>
+                      <View>
+                        <Text style={[styles.resultSymbol, { color: colors.text }]}>{item.symbol}</Text>
+                        <Text style={[styles.resultName, { color: colors.textSecondary }]}>{item.nameKr || item.name}</Text>
+                      </View>
                     </View>
-                    <View>
-                      <Text style={[styles.resultSymbol, { color: colors.text }]}>{item.symbol}</Text>
-                      <Text style={[styles.resultName, { color: colors.textSecondary }]}>{item.nameKr || item.name}</Text>
+                    <View style={styles.resultRight}>
+                      <Text style={[styles.priceText, { color: colors.text }]}>{formatPrice(item.price, item.type)}</Text>
+                      <Text style={[styles.changeText, { color: (item.change || 0) >= 0 ? colors.success : colors.error }]}>
+                        {(item.change || 0) >= 0 ? '+' : ''}{(item.change || 0).toFixed(2)}%
+                      </Text>
                     </View>
-                  </View>
-                  <View style={styles.resultRight}>
-                    <Text style={[styles.priceText, { color: colors.text }]}>{formatPrice(item.price, item.type)}</Text>
-                    <Text style={[styles.changeText, { color: (item.change || 0) >= 0 ? colors.success : colors.error }]}>
-                      {(item.change || 0) >= 0 ? '+' : ''}{(item.change || 0).toFixed(2)}%
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.addWatchlistButton, addedSymbols.has(item.symbol) && styles.addedButton]}
+                    onPress={() => handleAddToWatchlist(item)}
+                    disabled={addingSymbol === item.symbol || addedSymbols.has(item.symbol)}
+                  >
+                    {addingSymbol === item.symbol ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : addedSymbols.has(item.symbol) ? (
+                      <Ionicons name="checkmark" size={20} color={colors.success} />
+                    ) : (
+                      <Ionicons name="add" size={20} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                </View>
               ))
             )}
           </View>
@@ -414,9 +507,10 @@ const styles = StyleSheet.create({
   resultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    padding: 14,
+    paddingVertical: 10,
+    paddingLeft: 14,
+    paddingRight: 8,
     borderRadius: 12,
     marginBottom: 8,
     shadowColor: '#000',
@@ -425,10 +519,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
+  resultContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   resultLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  addWatchlistButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  addedButton: {
+    backgroundColor: 'transparent',
   },
   resultIcon: {
     width: 44,
