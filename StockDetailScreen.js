@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
+import { getTimeframeComparison } from './services/aiAnalysis';
 
 const { width } = Dimensions.get('window');
 
@@ -31,8 +33,40 @@ export default function StockDetailScreen({ route }) {
   const { stock } = route.params;
   const [selectedPeriod, setSelectedPeriod] = useState('1D');
   const [isFavorite, setIsFavorite] = useState(true);
+  const [timeframeScores, setTimeframeScores] = useState(null);
+  const [loadingScores, setLoadingScores] = useState(true);
+  const [selectedTimeframe, setSelectedTimeframe] = useState('mediumTerm'); // shortTerm, mediumTerm, longTerm
 
   const periods = ['1D', '1W', '1M', '3M', '1Y'];
+  const timeframeTabs = [
+    { key: 'shortTerm', label: '1H', fullLabel: '1시간' },
+    { key: 'mediumTerm', label: '1D', fullLabel: '1일' },
+    { key: 'longTerm', label: '1W', fullLabel: '1주' },
+  ];
+
+  // 타임프레임별 점수 가져오기
+  useEffect(() => {
+    const fetchTimeframeScores = async () => {
+      setLoadingScores(true);
+      try {
+        const data = await getTimeframeComparison(
+          stock.symbol,
+          stock.type || 'crypto',
+          1
+        );
+        setTimeframeScores(data);
+      } catch (error) {
+        console.error('Failed to fetch timeframe scores:', error);
+      } finally {
+        setLoadingScores(false);
+      }
+    };
+    fetchTimeframeScores();
+  }, [stock.symbol, stock.type]);
+
+  // 현재 선택된 타임프레임의 점수
+  const currentTimeframeScore = timeframeScores?.comparison?.[selectedTimeframe]?.score || stock.score || 50;
+  const currentTimeframeLabel = timeframeTabs.find(t => t.key === selectedTimeframe)?.fullLabel || '1일';
 
   const analysisData = {
     technicalScore: 75,
@@ -117,14 +151,81 @@ export default function StockDetailScreen({ route }) {
       <View style={[styles.scoreCard, { backgroundColor: colors.card }]}>
         <View style={styles.scoreHeader}>
           <Text style={[styles.scoreTitle, { color: colors.text }]}>AI 분석 점수</Text>
-          <View style={[styles.mainScoreBadge, { backgroundColor: getScoreColor(stock.score) }]}>
-            <Text style={styles.mainScoreText}>{stock.score}</Text>
-          </View>
+          {loadingScores ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <View style={[styles.mainScoreBadge, { backgroundColor: getScoreColor(currentTimeframeScore) }]}>
+              <Text style={styles.mainScoreText}>{currentTimeframeScore}</Text>
+            </View>
+          )}
         </View>
 
-        <View style={[styles.scoreGradeBadge, { backgroundColor: getScoreColor(stock.score) + '15' }]}>
-          <Text style={[styles.scoreGradeText, { color: getScoreColor(stock.score) }]}>
-            {getScoreLabel(stock.score)}
+        {/* 타임프레임 선택 탭 */}
+        <View style={[styles.timeframeSelector, { backgroundColor: colors.surfaceSecondary }]}>
+          {timeframeTabs.map((tf) => {
+            const tfScore = timeframeScores?.comparison?.[tf.key]?.score;
+            const isSelected = selectedTimeframe === tf.key;
+            return (
+              <TouchableOpacity
+                key={tf.key}
+                style={[
+                  styles.timeframeTab,
+                  isSelected && [styles.timeframeTabActive, { backgroundColor: colors.card }]
+                ]}
+                onPress={() => setSelectedTimeframe(tf.key)}
+              >
+                <Text style={[
+                  styles.timeframeLabel,
+                  { color: colors.textSecondary },
+                  isSelected && { color: colors.primary, fontWeight: '700' }
+                ]}>
+                  {tf.label}
+                </Text>
+                {tfScore !== undefined && (
+                  <Text style={[
+                    styles.timeframeScore,
+                    { color: getScoreColor(tfScore) },
+                    isSelected && { fontWeight: '700' }
+                  ]}>
+                    {tfScore}점
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* 선택된 타임프레임 정보 */}
+        <View style={styles.timeframeInfo}>
+          <Text style={[styles.timeframeInfoText, { color: colors.textSecondary }]}>
+            기준: {currentTimeframeLabel} 데이터
+          </Text>
+          {timeframeScores?.trend && (
+            <View style={[styles.trendBadge, {
+              backgroundColor: timeframeScores.trend === '상승세' ? colors.success + '20' :
+                             timeframeScores.trend === '하락세' ? colors.error + '20' :
+                             colors.warning + '20'
+            }]}>
+              <Ionicons
+                name={timeframeScores.trend === '상승세' ? 'trending-up' :
+                      timeframeScores.trend === '하락세' ? 'trending-down' : 'remove'}
+                size={14}
+                color={timeframeScores.trend === '상승세' ? colors.success :
+                       timeframeScores.trend === '하락세' ? colors.error : colors.warning}
+              />
+              <Text style={[styles.trendText, {
+                color: timeframeScores.trend === '상승세' ? colors.success :
+                       timeframeScores.trend === '하락세' ? colors.error : colors.warning
+              }]}>
+                {timeframeScores.trend}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={[styles.scoreGradeBadge, { backgroundColor: getScoreColor(currentTimeframeScore) + '15' }]}>
+          <Text style={[styles.scoreGradeText, { color: getScoreColor(currentTimeframeScore) }]}>
+            {getScoreLabel(currentTimeframeScore)}
           </Text>
         </View>
 
@@ -362,6 +463,59 @@ const styles = StyleSheet.create({
   },
   scoreGradeText: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  timeframeSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    padding: 4,
+    marginBottom: 12,
+  },
+  timeframeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+    gap: 2,
+  },
+  timeframeTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  timeframeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  timeframeScore: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  timeframeInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  timeframeInfoText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  trendBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  trendText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   subScores: {

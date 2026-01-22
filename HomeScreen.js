@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getCryptoData, getStockData } from './services/marketApi';
 import { useTheme } from './ThemeContext';
+import { getQuickScore } from './services/aiAnalysis';
 
 // 임시 AI 점수 생성 (실제로는 AI 분석 결과 사용)
 const generateAIScore = (change) => {
@@ -33,6 +34,14 @@ const getScoreLabel = (score) => {
   return '주의';
 };
 
+// 기본 타임프레임 설정
+const DEFAULT_TIMEFRAME = '1d';
+const TIMEFRAME_LABELS = {
+  '1h': '1H',
+  '1d': '1D',
+  '1w': '1W',
+};
+
 export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const colors = theme.colors;
@@ -40,6 +49,7 @@ export default function HomeScreen({ navigation }) {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshCount, setRefreshCount] = useState(5);
+  const [selectedTimeframe, setSelectedTimeframe] = useState(DEFAULT_TIMEFRAME);
 
   const fetchWatchlistData = async () => {
     try {
@@ -49,10 +59,32 @@ export default function HomeScreen({ navigation }) {
         getStockData(['AAPL', 'TSLA']),
       ]);
 
-      const allData = [...cryptos, ...usStocks].map(item => ({
-        ...item,
-        score: generateAIScore(item.change || 0),
-      }));
+      // 백엔드에서 AI 점수 가져오기
+      const allData = await Promise.all(
+        [...cryptos, ...usStocks].map(async (item) => {
+          try {
+            const scoreData = await getQuickScore(
+              item.symbol,
+              item.type || 'crypto',
+              selectedTimeframe
+            );
+            return {
+              ...item,
+              score: scoreData.score || generateAIScore(item.change || 0),
+              timeframe: selectedTimeframe,
+              timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
+            };
+          } catch (err) {
+            // 에러 시 로컬 점수 사용
+            return {
+              ...item,
+              score: generateAIScore(item.change || 0),
+              timeframe: selectedTimeframe,
+              timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
+            };
+          }
+        })
+      );
 
       setStocks(allData);
     } catch (error) {
@@ -65,7 +97,7 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     fetchWatchlistData();
-  }, []);
+  }, [selectedTimeframe]);
 
   const onRefresh = () => {
     if (refreshCount <= 0) {
@@ -110,12 +142,40 @@ export default function HomeScreen({ navigation }) {
         {/* 오늘의 내 관심 분야 점수 */}
         <View style={[styles.scoreCard, { backgroundColor: colors.card }]}>
           <View style={styles.scoreHeader}>
-            <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>오늘의 내 관심 분야 점수</Text>
+            <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>내 관심 분야 점수</Text>
             <View style={styles.refreshInfo}>
               <Text style={[styles.refreshLabel, { color: colors.textTertiary }]}>새로고침</Text>
               <Text style={[styles.refreshCount, { color: colors.primary }]}>{refreshCount}/5</Text>
             </View>
           </View>
+
+          {/* 타임프레임 선택기 */}
+          <View style={[styles.timeframeSelector, { backgroundColor: colors.surfaceSecondary }]}>
+            {Object.entries(TIMEFRAME_LABELS).map(([key, label]) => (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.timeframeButton,
+                  selectedTimeframe === key && [styles.timeframeButtonActive, { backgroundColor: colors.card }]
+                ]}
+                onPress={() => {
+                  if (selectedTimeframe !== key) {
+                    setLoading(true);
+                    setSelectedTimeframe(key);
+                  }
+                }}
+              >
+                <Text style={[
+                  styles.timeframeButtonText,
+                  { color: colors.textSecondary },
+                  selectedTimeframe === key && { color: colors.primary, fontWeight: '700' }
+                ]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <View style={styles.scoreRow}>
             <Text style={[styles.scoreNumber, { color: colors.text }]}>{avgScore}</Text>
             <Text style={[styles.scoreUnit, { color: colors.text }]}>점</Text>
@@ -125,6 +185,10 @@ export default function HomeScreen({ navigation }) {
               </Text>
             </View>
           </View>
+
+          <Text style={[styles.timeframeHint, { color: colors.textTertiary }]}>
+            기준: {TIMEFRAME_LABELS[selectedTimeframe]} 데이터 기반 AI 분석
+          </Text>
         </View>
 
         {/* 내 관심 종목 리스트 */}
@@ -163,8 +227,13 @@ export default function HomeScreen({ navigation }) {
                 </Text>
               </View>
 
-              <View style={[styles.aiScoreBadge, { backgroundColor: getScoreColor(stock.score || 50) }]}>
-                <Text style={styles.aiScoreText}>{stock.score || 50}</Text>
+              <View style={styles.scoreContainer}>
+                <View style={[styles.aiScoreBadge, { backgroundColor: getScoreColor(stock.score || 50) }]}>
+                  <Text style={styles.aiScoreText}>{stock.score || 50}</Text>
+                </View>
+                <Text style={[styles.scoreTimeframe, { color: colors.textTertiary }]}>
+                  {stock.timeframeLabel || '1D'}
+                </Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -257,6 +326,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  timeframeSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    padding: 4,
+    marginBottom: 16,
+  },
+  timeframeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  timeframeButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  timeframeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  timeframeHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   section: {
     paddingHorizontal: 16,
   },
@@ -331,6 +432,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 6,
   },
+  scoreContainer: {
+    alignItems: 'center',
+    gap: 4,
+  },
   aiScoreBadge: {
     width: 40,
     height: 40,
@@ -342,6 +447,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  scoreTimeframe: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#9CA3AF',
   },
   stockChange: {
     fontSize: 13,

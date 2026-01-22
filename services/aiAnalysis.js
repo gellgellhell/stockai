@@ -127,6 +127,72 @@ export const getIndicators = async (symbol, type = 'crypto') => {
 };
 
 /**
+ * 타임프레임별 점수 비교 조회 (단기/중기/장기)
+ * @param {string} symbol - 종목 심볼
+ * @param {string} type - 'crypto' 또는 'stock'
+ * @param {number} level - 분석 레벨 (1, 2, 3)
+ * @returns {Object} { shortTerm, mediumTerm, longTerm, overall, trend }
+ */
+export const getTimeframeComparison = async (symbol, type = 'crypto', level = 1) => {
+  try {
+    const response = await fetch(
+      `${API_BASE}/analysis/compare/${symbol}?type=${type}&level=${level}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error) {
+    console.error('Timeframe comparison error:', error);
+    // 에러 시 기본값 반환
+    return {
+      symbol,
+      overall: { score: 50, signal: '중립' },
+      trend: '횡보',
+      comparison: {
+        shortTerm: { timeframe: '1h', timeframeLabel: '1시간', score: 50, signal: '중립' },
+        mediumTerm: { timeframe: '1d', timeframeLabel: '1일', score: 50, signal: '중립' },
+        longTerm: { timeframe: '1w', timeframeLabel: '1주', score: 50, signal: '중립' }
+      },
+      error: error.message
+    };
+  }
+};
+
+/**
+ * 모든 타임프레임 점수 일괄 조회
+ * @param {string} symbol - 종목 심볼
+ * @param {string} type - 'crypto' 또는 'stock'
+ * @param {number} level - 분석 레벨
+ * @returns {Object} 모든 타임프레임 점수
+ */
+export const getAllTimeframeScores = async (symbol, type = 'crypto', level = 1) => {
+  try {
+    const response = await fetch(
+      `${API_BASE}/analysis/all-timeframes/${symbol}?type=${type}&level=${level}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error) {
+    console.error('All timeframes error:', error);
+    return {
+      symbol,
+      overall: { score: 50, signal: '중립' },
+      timeframes: {},
+      error: error.message
+    };
+  }
+};
+
+/**
  * 백엔드 헬스 체크
  * @returns {boolean} 서버 상태
  */
