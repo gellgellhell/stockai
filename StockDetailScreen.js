@@ -59,7 +59,7 @@ export default function StockDetailScreen({ route }) {
       try {
         const result = await checkWatchlist(user.uid, stock.symbol);
         if (result.success) {
-          setIsFavorite(result.data.isInWatchlist);
+          setIsFavorite(result.data.inWatchlist);
         }
       } catch (error) {
         console.error('Failed to check watchlist:', error);

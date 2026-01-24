@@ -60,7 +60,7 @@ export default function SearchScreen({ navigation }) {
 
       // 이미 추가되어 있는지 확인
       const checkResult = await checkWatchlist(user.uid, item.symbol);
-      if (checkResult.success && checkResult.data.isInWatchlist) {
+      if (checkResult.success && checkResult.data.inWatchlist) {
         Alert.alert('알림', '이미 관심종목에 추가된 종목입니다.');
         setAddedSymbols(prev => new Set([...prev, item.symbol]));
         return;
