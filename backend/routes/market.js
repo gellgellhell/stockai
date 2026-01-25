@@ -115,20 +115,21 @@ router.get('/stock/:symbol', async (req, res) => {
     const quote = result.indicators?.quote?.[0];
     const closes = quote?.close || [];
     const currentPrice = meta.regularMarketPrice;
-    const prevClose = meta.previousClose;
-    const change = ((currentPrice - prevClose) / prevClose * 100).toFixed(2);
+    const prevClose = meta.previousClose || meta.chartPreviousClose;
+    const change = prevClose ? ((currentPrice - prevClose) / prevClose * 100) : 0;
 
     res.json({
       success: true,
       data: {
         symbol: meta.symbol,
+        name: meta.shortName || meta.symbol,
         price: currentPrice,
         prevClose,
-        change: parseFloat(change),
+        change: parseFloat(change.toFixed(2)),
         currency: meta.currency,
         exchange: meta.exchangeName,
-        high: Math.max(...closes.filter(Boolean)),
-        low: Math.min(...closes.filter(Boolean))
+        high: closes.filter(Boolean).length > 0 ? Math.max(...closes.filter(Boolean)) : currentPrice,
+        low: closes.filter(Boolean).length > 0 ? Math.min(...closes.filter(Boolean)) : currentPrice
       }
     });
   } catch (error) {
