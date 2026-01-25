@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useAuth } from './AuthContext';
-import { getTimeframeComparison } from './services/aiAnalysis';
+import { getQuickScore } from './services/aiAnalysis';
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from './services/watchlistService';
 
 const { width } = Dimensions.get('window');
@@ -38,15 +38,20 @@ export default function StockDetailScreen({ route }) {
   const [selectedPeriod, setSelectedPeriod] = useState('1D');
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(true);
-  const [timeframeScores, setTimeframeScores] = useState(null);
-  const [loadingScores, setLoadingScores] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState('mediumTerm'); // shortTerm, mediumTerm, longTerm
+
+  // 각 타임프레임별 개별 상태 관리
+  const [timeframeData, setTimeframeData] = useState({
+    shortTerm: { score: null, loaded: false, loading: false },
+    mediumTerm: { score: null, loaded: false, loading: false },
+    longTerm: { score: null, loaded: false, loading: false },
+  });
 
   const periods = ['1D', '1W', '1M', '3M', '1Y'];
   const timeframeTabs = [
-    { key: 'shortTerm', label: '1H', fullLabel: '1시간' },
-    { key: 'mediumTerm', label: '1D', fullLabel: '1일' },
-    { key: 'longTerm', label: '1W', fullLabel: '1주' },
+    { key: 'shortTerm', label: '1H', fullLabel: '1시간', apiTimeframe: '1h' },
+    { key: 'mediumTerm', label: '1D', fullLabel: '1일', apiTimeframe: '1d' },
+    { key: 'longTerm', label: '1W', fullLabel: '1주', apiTimeframe: '1w' },
   ];
 
   // 관심종목 여부 확인
@@ -70,25 +75,42 @@ export default function StockDetailScreen({ route }) {
     checkFavoriteStatus();
   }, [user?.uid, stock.symbol]);
 
-  // 타임프레임별 점수 가져오기
-  useEffect(() => {
-    const fetchTimeframeScores = async () => {
-      setLoadingScores(true);
-      try {
-        const data = await getTimeframeComparison(
-          stock.symbol,
-          stock.type || 'crypto',
-          1
-        );
-        setTimeframeScores(data);
-      } catch (error) {
-        console.error('Failed to fetch timeframe scores:', error);
-      } finally {
-        setLoadingScores(false);
-      }
-    };
-    fetchTimeframeScores();
-  }, [stock.symbol, stock.type]);
+  // 개별 타임프레임 새로고침 함수
+  const refreshTimeframe = async (timeframeKey) => {
+    const tab = timeframeTabs.find(t => t.key === timeframeKey);
+    if (!tab) return;
+
+    // 로딩 상태 설정
+    setTimeframeData(prev => ({
+      ...prev,
+      [timeframeKey]: { ...prev[timeframeKey], loading: true }
+    }));
+
+    try {
+      const data = await getQuickScore(
+        stock.symbol,
+        stock.type || 'crypto',
+        tab.apiTimeframe
+      );
+
+      setTimeframeData(prev => ({
+        ...prev,
+        [timeframeKey]: {
+          score: data.score,
+          signal: data.signal,
+          loaded: true,
+          loading: false,
+        }
+      }));
+    } catch (error) {
+      console.error(`Failed to fetch ${timeframeKey} score:`, error);
+      setTimeframeData(prev => ({
+        ...prev,
+        [timeframeKey]: { ...prev[timeframeKey], loading: false }
+      }));
+      Alert.alert('오류', '점수를 불러오는데 실패했습니다.');
+    }
+  };
 
   // 관심종목 토글 핸들러
   const handleToggleFavorite = async () => {
@@ -131,8 +153,9 @@ export default function StockDetailScreen({ route }) {
     }
   };
 
-  // 현재 선택된 타임프레임의 점수
-  const currentTimeframeScore = timeframeScores?.comparison?.[selectedTimeframe]?.score || stock.score || 50;
+  // 현재 선택된 타임프레임의 데이터
+  const currentData = timeframeData[selectedTimeframe];
+  const currentTimeframeScore = currentData.loaded ? currentData.score : null;
   const currentTimeframeLabel = timeframeTabs.find(t => t.key === selectedTimeframe)?.fullLabel || '1일';
 
   const analysisData = {
@@ -222,11 +245,15 @@ export default function StockDetailScreen({ route }) {
       <View style={[styles.scoreCard, { backgroundColor: colors.card }]}>
         <View style={styles.scoreHeader}>
           <Text style={[styles.scoreTitle, { color: colors.text }]}>AI 분석 점수</Text>
-          {loadingScores ? (
+          {currentData.loading ? (
             <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
+          ) : currentTimeframeScore !== null ? (
             <View style={[styles.mainScoreBadge, { backgroundColor: getScoreColor(currentTimeframeScore) }]}>
               <Text style={styles.mainScoreText}>{currentTimeframeScore}</Text>
+            </View>
+          ) : (
+            <View style={[styles.mainScoreBadge, { backgroundColor: colors.textTertiary }]}>
+              <Text style={styles.mainScoreText}>?</Text>
             </View>
           )}
         </View>
@@ -234,7 +261,7 @@ export default function StockDetailScreen({ route }) {
         {/* 타임프레임 선택 탭 */}
         <View style={[styles.timeframeSelector, { backgroundColor: colors.surfaceSecondary }]}>
           {timeframeTabs.map((tf) => {
-            const tfScore = timeframeScores?.comparison?.[tf.key]?.score;
+            const tfData = timeframeData[tf.key];
             const isSelected = selectedTimeframe === tf.key;
             return (
               <TouchableOpacity
@@ -252,13 +279,19 @@ export default function StockDetailScreen({ route }) {
                 ]}>
                   {tf.label}
                 </Text>
-                {tfScore !== undefined && (
+                {tfData.loading ? (
+                  <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 2 }} />
+                ) : tfData.loaded ? (
                   <Text style={[
                     styles.timeframeScore,
-                    { color: getScoreColor(tfScore) },
+                    { color: getScoreColor(tfData.score) },
                     isSelected && { fontWeight: '700' }
                   ]}>
-                    {tfScore}점
+                    {tfData.score}점
+                  </Text>
+                ) : (
+                  <Text style={[styles.timeframeNotLoaded, { color: colors.textTertiary }]}>
+                    미확인
                   </Text>
                 )}
               </TouchableOpacity>
@@ -266,64 +299,91 @@ export default function StockDetailScreen({ route }) {
           })}
         </View>
 
-        {/* 선택된 타임프레임 정보 */}
-        <View style={styles.timeframeInfo}>
-          <Text style={[styles.timeframeInfoText, { color: colors.textSecondary }]}>
-            기준: {currentTimeframeLabel} 데이터
-          </Text>
-          {timeframeScores?.trend && (
-            <View style={[styles.trendBadge, {
-              backgroundColor: timeframeScores.trend === '상승세' ? colors.success + '20' :
-                             timeframeScores.trend === '하락세' ? colors.error + '20' :
-                             colors.warning + '20'
-            }]}>
-              <Ionicons
-                name={timeframeScores.trend === '상승세' ? 'trending-up' :
-                      timeframeScores.trend === '하락세' ? 'trending-down' : 'remove'}
-                size={14}
-                color={timeframeScores.trend === '상승세' ? colors.success :
-                       timeframeScores.trend === '하락세' ? colors.error : colors.warning}
-              />
-              <Text style={[styles.trendText, {
-                color: timeframeScores.trend === '상승세' ? colors.success :
-                       timeframeScores.trend === '하락세' ? colors.error : colors.warning
-              }]}>
-                {timeframeScores.trend}
+        {/* 새로고침 필요 메시지 또는 점수 정보 */}
+        {!currentData.loaded && !currentData.loading ? (
+          <View style={[styles.refreshNeeded, { backgroundColor: colors.primaryBg }]}>
+            <Ionicons name="refresh-outline" size={20} color={colors.primary} />
+            <Text style={[styles.refreshNeededText, { color: colors.text }]}>
+              {currentTimeframeLabel} 분석 정보를 확인하려면{'\n'}새로고침이 필요합니다
+            </Text>
+            <TouchableOpacity
+              style={[styles.refreshButton, { backgroundColor: colors.primary }]}
+              onPress={() => refreshTimeframe(selectedTimeframe)}
+            >
+              <Text style={styles.refreshButtonText}>새로고침</Text>
+            </TouchableOpacity>
+          </View>
+        ) : currentData.loading ? (
+          <View style={[styles.refreshNeeded, { backgroundColor: colors.primaryBg }]}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.refreshNeededText, { color: colors.textSecondary }]}>
+              {currentTimeframeLabel} 분석 중...
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* 선택된 타임프레임 정보 */}
+            <View style={styles.timeframeInfo}>
+              <Text style={[styles.timeframeInfoText, { color: colors.textSecondary }]}>
+                기준: {currentTimeframeLabel} 데이터
+              </Text>
+              {currentData.signal && (
+                <View style={[styles.trendBadge, {
+                  backgroundColor: currentData.signal === '매수' || currentData.signal === '강력매수' ? colors.success + '20' :
+                                 currentData.signal === '매도' || currentData.signal === '강력매도' ? colors.error + '20' :
+                                 colors.warning + '20'
+                }]}>
+                  <Ionicons
+                    name={currentData.signal === '매수' || currentData.signal === '강력매수' ? 'trending-up' :
+                          currentData.signal === '매도' || currentData.signal === '강력매도' ? 'trending-down' : 'remove'}
+                    size={14}
+                    color={currentData.signal === '매수' || currentData.signal === '강력매수' ? colors.success :
+                           currentData.signal === '매도' || currentData.signal === '강력매도' ? colors.error : colors.warning}
+                  />
+                  <Text style={[styles.trendText, {
+                    color: currentData.signal === '매수' || currentData.signal === '강력매수' ? colors.success :
+                           currentData.signal === '매도' || currentData.signal === '강력매도' ? colors.error : colors.warning
+                  }]}>
+                    {currentData.signal}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={[styles.scoreGradeBadge, { backgroundColor: getScoreColor(currentTimeframeScore) + '15' }]}>
+              <Text style={[styles.scoreGradeText, { color: getScoreColor(currentTimeframeScore) }]}>
+                {getScoreLabel(currentTimeframeScore)}
               </Text>
             </View>
-          )}
-        </View>
+          </>
+        )}
 
-        <View style={[styles.scoreGradeBadge, { backgroundColor: getScoreColor(currentTimeframeScore) + '15' }]}>
-          <Text style={[styles.scoreGradeText, { color: getScoreColor(currentTimeframeScore) }]}>
-            {getScoreLabel(currentTimeframeScore)}
-          </Text>
-        </View>
-
-        {/* 세부 점수 */}
-        <View style={styles.subScores}>
-          {[
-            { label: '기술적 분석', score: analysisData.technicalScore },
-            { label: '추세', score: analysisData.trendScore },
-            { label: '거래량', score: analysisData.volumeScore },
-            { label: '모멘텀', score: analysisData.momentumScore },
-          ].map((item, index) => (
-            <View key={index} style={styles.subScoreItem}>
-              <View style={styles.subScoreHeader}>
-                <Text style={[styles.subScoreLabel, { color: colors.textSecondary }]}>{item.label}</Text>
-                <Text style={[styles.subScoreValue, { color: getScoreColor(item.score) }]}>
-                  {item.score}
-                </Text>
+        {/* 세부 점수 - 점수가 로드된 경우에만 표시 */}
+        {currentData.loaded && (
+          <View style={styles.subScores}>
+            {[
+              { label: '기술적 분석', score: analysisData.technicalScore },
+              { label: '추세', score: analysisData.trendScore },
+              { label: '거래량', score: analysisData.volumeScore },
+              { label: '모멘텀', score: analysisData.momentumScore },
+            ].map((item, index) => (
+              <View key={index} style={styles.subScoreItem}>
+                <View style={styles.subScoreHeader}>
+                  <Text style={[styles.subScoreLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                  <Text style={[styles.subScoreValue, { color: getScoreColor(item.score) }]}>
+                    {item.score}
+                  </Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.surfaceSecondary }]}>
+                  <View style={[styles.progressFill, {
+                    width: `${item.score}%`,
+                    backgroundColor: getScoreColor(item.score)
+                  }]} />
+                </View>
               </View>
-              <View style={[styles.progressBar, { backgroundColor: colors.surfaceSecondary }]}>
-                <View style={[styles.progressFill, {
-                  width: `${item.score}%`,
-                  backgroundColor: getScoreColor(item.score)
-                }]} />
-              </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* 주요 시그널 */}
@@ -566,6 +626,36 @@ const styles = StyleSheet.create({
   timeframeScore: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  timeframeNotLoaded: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  refreshNeeded: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  refreshNeededText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  refreshButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  refreshButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   timeframeInfo: {
     flexDirection: 'row',
