@@ -3,8 +3,10 @@
 // CoinGecko API (무료, 키 불필요)
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 
-// Yahoo Finance API (비공식, 무료)
-const YAHOO_FINANCE_BASE = 'https://query1.finance.yahoo.com/v8/finance';
+// 백엔드 API (Yahoo Finance 프록시)
+const BACKEND_API = __DEV__
+  ? 'http://localhost:3001/api'
+  : 'https://stockai-backend-production.up.railway.app/api';
 
 // 인기 코인 ID 매핑
 const COIN_IDS = {
@@ -120,45 +122,35 @@ export const getTopCryptos = async (limit = 20) => {
 };
 
 /**
- * 주식 가격 데이터 가져오기 (Yahoo Finance)
+ * 주식 가격 데이터 가져오기 (백엔드 프록시 사용)
  */
 export const getStockData = async (symbols = ['AAPL', 'TSLA']) => {
   try {
     const results = await Promise.all(
       symbols.map(async (symbol) => {
         try {
-          // Yahoo Finance quote endpoint
-          const response = await fetch(
-            `${YAHOO_FINANCE_BASE}/chart/${symbol}?interval=1d&range=1d`
-          );
+          // 백엔드 API를 통해 Yahoo Finance 데이터 가져오기
+          const response = await fetch(`${BACKEND_API}/market/stock/${symbol}`);
 
           if (!response.ok) return null;
 
-          const data = await response.json();
-          const result = data.chart?.result?.[0];
+          const result = await response.json();
 
-          if (!result) return null;
+          if (!result.success || !result.data) return null;
 
-          const meta = result.meta;
-          const quote = result.indicators?.quote?.[0];
-          const prevClose = meta.previousClose || meta.chartPreviousClose;
-          const currentPrice = meta.regularMarketPrice;
-          const change = prevClose ? ((currentPrice - prevClose) / prevClose * 100) : 0;
+          const data = result.data;
 
           return {
-            symbol: meta.symbol,
-            name: getStockName(meta.symbol),
-            price: currentPrice,
-            change: parseFloat(change.toFixed(2)),
-            prevClose: prevClose,
-            open: quote?.open?.[0],
-            high: quote?.high?.[0],
-            low: quote?.low?.[0],
-            volume: quote?.volume?.[0],
-            currency: meta.currency,
-            market: meta.exchangeName,
+            symbol: data.symbol,
+            name: getStockName(data.symbol),
+            nameKr: getStockName(data.symbol),
+            price: data.price,
+            change: data.change || 0,
+            prevClose: data.prevClose,
+            currency: data.currency,
+            market: data.exchange,
             type: 'stock',
-            region: meta.symbol.includes('.KS') || meta.symbol.includes('.KQ') ? 'KR' : 'US',
+            region: data.symbol.includes('.KS') || data.symbol.includes('.KQ') ? 'KR' : 'US',
           };
         } catch (err) {
           console.error(`Failed to fetch ${symbol}:`, err);
@@ -191,26 +183,21 @@ export const getTopUSStocks = async () => {
 };
 
 /**
- * 주식 검색 (Yahoo Finance)
+ * 주식 검색 (백엔드 프록시 사용)
  */
 export const searchStocks = async (query) => {
   try {
     const response = await fetch(
-      `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=10&newsCount=0`
+      `${BACKEND_API}/market/search?q=${encodeURIComponent(query)}`
     );
 
     if (!response.ok) throw new Error('Search API error');
 
-    const data = await response.json();
+    const result = await response.json();
 
-    return (data.quotes || [])
-      .filter(q => q.quoteType === 'EQUITY' || q.quoteType === 'CRYPTOCURRENCY')
-      .map(q => ({
-        symbol: q.symbol,
-        name: q.shortname || q.longname,
-        exchange: q.exchange,
-        type: q.quoteType === 'CRYPTOCURRENCY' ? 'crypto' : 'stock',
-      }));
+    if (!result.success) return [];
+
+    return result.data.stocks || [];
   } catch (error) {
     console.error('Search failed:', error);
     return [];
