@@ -68,8 +68,8 @@ export default function HomeScreen({ navigation }) {
           getWatchlistLimit(user.uid)
         ]);
 
-        if (watchlistResult.success && watchlistResult.data?.length > 0) {
-          watchlistItems = watchlistResult.data;
+        if (watchlistResult.success && watchlistResult.data?.items?.length > 0) {
+          watchlistItems = watchlistResult.data.items;
         }
 
         if (limitResult.success) {
@@ -78,64 +78,60 @@ export default function HomeScreen({ navigation }) {
             limit: limitResult.data.limit
           });
         }
-      }
 
-      // 관심종목이 없으면 기본 종목 표시
-      if (watchlistItems.length === 0) {
-        const [cryptos, usStocks] = await Promise.all([
-          getCryptoData(['BTC', 'ETH']),
-          getStockData(['AAPL', 'TSLA']),
-        ]);
-        watchlistItems = [...cryptos, ...usStocks];
-      } else {
         // 관심종목의 실시간 가격 데이터 가져오기
-        const cryptoSymbols = watchlistItems.filter(i => i.type === 'crypto').map(i => i.symbol);
-        const stockSymbols = watchlistItems.filter(i => i.type === 'stock').map(i => i.symbol);
+        if (watchlistItems.length > 0) {
+          const cryptoSymbols = watchlistItems.filter(i => i.type === 'crypto').map(i => i.symbol);
+          const stockSymbols = watchlistItems.filter(i => i.type === 'stock').map(i => i.symbol);
 
-        const [cryptoPrices, stockPrices] = await Promise.all([
-          cryptoSymbols.length > 0 ? getCryptoData(cryptoSymbols) : [],
-          stockSymbols.length > 0 ? getStockData(stockSymbols) : [],
-        ]);
+          const [cryptoPrices, stockPrices] = await Promise.all([
+            cryptoSymbols.length > 0 ? getCryptoData(cryptoSymbols) : [],
+            stockSymbols.length > 0 ? getStockData(stockSymbols) : [],
+          ]);
 
-        // 가격 데이터 병합
-        const priceMap = new Map();
-        [...cryptoPrices, ...stockPrices].forEach(item => {
-          priceMap.set(item.symbol, item);
-        });
+          // 가격 데이터 병합
+          const priceMap = new Map();
+          [...cryptoPrices, ...stockPrices].forEach(item => {
+            priceMap.set(item.symbol, item);
+          });
 
-        watchlistItems = watchlistItems.map(item => ({
-          ...item,
-          ...(priceMap.get(item.symbol) || {}),
-        }));
+          watchlistItems = watchlistItems.map(item => ({
+            ...item,
+            ...(priceMap.get(item.symbol) || {}),
+          }));
+        }
       }
 
-      // 백엔드에서 AI 점수 가져오기
-      const allData = await Promise.all(
-        watchlistItems.map(async (item) => {
-          try {
-            const scoreData = await getQuickScore(
-              item.symbol,
-              item.type || 'crypto',
-              selectedTimeframe
-            );
-            return {
-              ...item,
-              score: scoreData.score || generateAIScore(item.change || 0),
-              timeframe: selectedTimeframe,
-              timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
-            };
-          } catch (err) {
-            return {
-              ...item,
-              score: generateAIScore(item.change || 0),
-              timeframe: selectedTimeframe,
-              timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
-            };
-          }
-        })
-      );
-
-      setStocks(allData);
+      // 관심종목이 있으면 AI 점수 가져오기
+      if (watchlistItems.length > 0) {
+        const allData = await Promise.all(
+          watchlistItems.map(async (item) => {
+            try {
+              const scoreData = await getQuickScore(
+                item.symbol,
+                item.type || 'crypto',
+                selectedTimeframe
+              );
+              return {
+                ...item,
+                score: scoreData.score || generateAIScore(item.change || 0),
+                timeframe: selectedTimeframe,
+                timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
+              };
+            } catch (err) {
+              return {
+                ...item,
+                score: generateAIScore(item.change || 0),
+                timeframe: selectedTimeframe,
+                timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
+              };
+            }
+          })
+        );
+        setStocks(allData);
+      } else {
+        setStocks([]);
+      }
     } catch (error) {
       console.error('Failed to fetch watchlist:', error);
     } finally {
@@ -298,7 +294,24 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {stocks.map((stock, index) => (
+          {stocks.length === 0 ? (
+            <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+              <Ionicons name="star-outline" size={48} color={colors.textTertiary} />
+              <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
+                관심종목이 없습니다
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>
+                검색에서 종목을 추가해보세요
+              </Text>
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={() => navigation.navigate('Search')}
+              >
+                <Ionicons name="search" size={18} color="#FFFFFF" />
+                <Text style={styles.emptyButtonText}>종목 검색하기</Text>
+              </TouchableOpacity>
+            </View>
+          ) : stocks.map((stock, index) => (
             <View
               key={stock.symbol + index}
               style={[styles.stockCard, { backgroundColor: colors.card }]}
@@ -351,14 +364,16 @@ export default function HomeScreen({ navigation }) {
             </View>
           ))}
 
-          {/* 종목 추가 버튼 */}
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => navigation.navigate('Search')}
-          >
-            <Ionicons name="add" size={24} color={colors.textTertiary} />
-            <Text style={[styles.addButtonText, { color: colors.textTertiary }]}>관심 종목 추가</Text>
-          </TouchableOpacity>
+          {/* 종목 추가 버튼 - 관심종목이 있을 때만 표시 */}
+          {stocks.length > 0 && (
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => navigation.navigate('Search')}
+            >
+              <Ionicons name="add" size={24} color={colors.textTertiary} />
+              <Text style={[styles.addButtonText, { color: colors.textTertiary }]}>관심 종목 추가</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={{ height: 100 }} />
@@ -596,6 +611,37 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 15,
     color: '#9CA3AF',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    borderRadius: 16,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+    gap: 8,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
   refreshButton: {
     position: 'absolute',
