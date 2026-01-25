@@ -90,7 +90,7 @@ router.get('/crypto/:id', async (req, res) => {
 
 /**
  * GET /api/market/stock/:symbol
- * 주식 정보
+ * 주식 정보 (Yahoo Finance)
  */
 router.get('/stock/:symbol', async (req, res) => {
   try {
