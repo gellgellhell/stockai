@@ -177,10 +177,10 @@ export default function StockDetailScreen({ route }) {
           </TouchableOpacity>
         </View>
 
-        <Text style={[styles.currentPrice, { color: colors.text }]}>{stock.price.toLocaleString()} USD</Text>
+        <Text style={[styles.currentPrice, { color: colors.text }]}>{stock.price ? stock.price.toLocaleString() : '-'} USD</Text>
         <View style={styles.changeRow}>
-          <Text style={[styles.changeText, { color: stock.change >= 0 ? colors.success : colors.error }]}>
-            {stock.change >= 0 ? '+' : ''}{stock.change}%
+          <Text style={[styles.changeText, { color: (stock.change || 0) >= 0 ? colors.success : colors.error }]}>
+            {(stock.change || 0) >= 0 ? '+' : ''}{(stock.change || 0).toFixed(2)}%
           </Text>
           <Text style={[styles.changeLabel, { color: colors.textTertiary }]}>최고 연 0.00%</Text>
         </View>
