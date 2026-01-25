@@ -142,14 +142,12 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     fetchWatchlistData();
-  }, [selectedTimeframe, user?.uid]);
+  }, [selectedTimeframe]);
 
   // 화면에 다시 포커스될 때 데이터 새로고침
   useFocusEffect(
     useCallback(() => {
-      if (!loading) {
-        fetchWatchlistData();
-      }
+      fetchWatchlistData();
     }, [selectedTimeframe, user?.uid])
   );
 
