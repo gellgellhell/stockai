@@ -30,6 +30,24 @@ const getScoreLabel = (score) => {
   return '주의';
 };
 
+// 경과 시간 표시 함수
+const getTimeAgo = (timestamp) => {
+  if (!timestamp) return null;
+
+  const now = Date.now();
+  const diff = now - timestamp;
+
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return '방금 전';
+  if (minutes < 60) return `${minutes}분 전`;
+  if (hours < 24) return `${hours}시간 전`;
+  return `${days}일 전`;
+};
+
 export default function StockDetailScreen({ route }) {
   const { theme } = useTheme();
   const colors = theme.colors;
@@ -42,10 +60,19 @@ export default function StockDetailScreen({ route }) {
 
   // 각 타임프레임별 개별 상태 관리
   const [timeframeData, setTimeframeData] = useState({
-    shortTerm: { score: null, loaded: false, loading: false },
-    mediumTerm: { score: null, loaded: false, loading: false },
-    longTerm: { score: null, loaded: false, loading: false },
+    shortTerm: { score: null, loaded: false, loading: false, lastRefreshed: null },
+    mediumTerm: { score: null, loaded: false, loading: false, lastRefreshed: null },
+    longTerm: { score: null, loaded: false, loading: false, lastRefreshed: null },
   });
+
+  // 경과 시간 업데이트를 위한 리렌더링
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceUpdate(n => n + 1);
+    }, 60000); // 1분마다 업데이트
+    return () => clearInterval(interval);
+  }, []);
 
   const periods = ['1D', '1W', '1M', '3M', '1Y'];
   const timeframeTabs = [
@@ -100,6 +127,7 @@ export default function StockDetailScreen({ route }) {
           signal: data.signal,
           loaded: true,
           loading: false,
+          lastRefreshed: Date.now(),
         }
       }));
     } catch (error) {
@@ -263,6 +291,7 @@ export default function StockDetailScreen({ route }) {
           {timeframeTabs.map((tf) => {
             const tfData = timeframeData[tf.key];
             const isSelected = selectedTimeframe === tf.key;
+            const timeAgo = getTimeAgo(tfData.lastRefreshed);
             return (
               <TouchableOpacity
                 key={tf.key}
@@ -282,13 +311,18 @@ export default function StockDetailScreen({ route }) {
                 {tfData.loading ? (
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 2 }} />
                 ) : tfData.loaded ? (
-                  <Text style={[
-                    styles.timeframeScore,
-                    { color: getScoreColor(tfData.score) },
-                    isSelected && { fontWeight: '700' }
-                  ]}>
-                    {tfData.score}점
-                  </Text>
+                  <>
+                    <Text style={[
+                      styles.timeframeScore,
+                      { color: getScoreColor(tfData.score) },
+                      isSelected && { fontWeight: '700' }
+                    ]}>
+                      {tfData.score}점
+                    </Text>
+                    <Text style={[styles.timeAgoText, { color: colors.textTertiary }]}>
+                      {timeAgo}
+                    </Text>
+                  </>
                 ) : (
                   <Text style={[styles.timeframeNotLoaded, { color: colors.textTertiary }]}>
                     미확인
@@ -302,32 +336,58 @@ export default function StockDetailScreen({ route }) {
         {/* 새로고침 필요 메시지 또는 점수 정보 */}
         {!currentData.loaded && !currentData.loading ? (
           <View style={[styles.refreshNeeded, { backgroundColor: colors.primaryBg }]}>
-            <Ionicons name="refresh-outline" size={20} color={colors.primary} />
-            <Text style={[styles.refreshNeededText, { color: colors.text }]}>
-              {currentTimeframeLabel} 분석 정보를 확인하려면{'\n'}새로고침이 필요합니다
+            <View style={styles.refreshIconContainer}>
+              <Ionicons name="analytics-outline" size={32} color={colors.primary} />
+            </View>
+            <Text style={[styles.refreshNeededTitle, { color: colors.text }]}>
+              {currentTimeframeLabel} 분석 데이터 없음
+            </Text>
+            <Text style={[styles.refreshNeededSubtitle, { color: colors.textSecondary }]}>
+              새로고침하여 AI 분석 점수를 확인하세요
             </Text>
             <TouchableOpacity
               style={[styles.refreshButton, { backgroundColor: colors.primary }]}
               onPress={() => refreshTimeframe(selectedTimeframe)}
             >
-              <Text style={styles.refreshButtonText}>새로고침</Text>
+              <Ionicons name="refresh" size={16} color="#FFFFFF" />
+              <Text style={styles.refreshButtonText}>분석하기</Text>
             </TouchableOpacity>
           </View>
         ) : currentData.loading ? (
           <View style={[styles.refreshNeeded, { backgroundColor: colors.primaryBg }]}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.refreshNeededText, { color: colors.textSecondary }]}>
-              {currentTimeframeLabel} 분석 중...
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.refreshNeededTitle, { color: colors.text }]}>
+              AI 분석 중...
+            </Text>
+            <Text style={[styles.refreshNeededSubtitle, { color: colors.textSecondary }]}>
+              {currentTimeframeLabel} 데이터를 분석하고 있습니다
             </Text>
           </View>
         ) : (
           <>
             {/* 선택된 타임프레임 정보 */}
             <View style={styles.timeframeInfo}>
-              <Text style={[styles.timeframeInfoText, { color: colors.textSecondary }]}>
-                기준: {currentTimeframeLabel} 데이터
-              </Text>
-              {currentData.signal && (
+              <View style={styles.timeframeInfoLeft}>
+                <Text style={[styles.timeframeInfoText, { color: colors.textSecondary }]}>
+                  {currentTimeframeLabel} 기준
+                </Text>
+                {currentData.lastRefreshed && (
+                  <Text style={[styles.lastUpdatedText, { color: colors.textTertiary }]}>
+                    업데이트: {getTimeAgo(currentData.lastRefreshed)}
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={[styles.miniRefreshButton, { borderColor: colors.primary }]}
+                onPress={() => refreshTimeframe(selectedTimeframe)}
+              >
+                <Ionicons name="refresh" size={14} color={colors.primary} />
+                <Text style={[styles.miniRefreshText, { color: colors.primary }]}>새로고침</Text>
+              </TouchableOpacity>
+            </View>
+
+            {currentData.signal && (
+              <View style={[styles.signalBadgeRow]}>
                 <View style={[styles.trendBadge, {
                   backgroundColor: currentData.signal === '매수' || currentData.signal === '강력매수' ? colors.success + '20' :
                                  currentData.signal === '매도' || currentData.signal === '강력매도' ? colors.error + '20' :
@@ -347,14 +407,13 @@ export default function StockDetailScreen({ route }) {
                     {currentData.signal}
                   </Text>
                 </View>
-              )}
-            </View>
-
-            <View style={[styles.scoreGradeBadge, { backgroundColor: getScoreColor(currentTimeframeScore) + '15' }]}>
-              <Text style={[styles.scoreGradeText, { color: getScoreColor(currentTimeframeScore) }]}>
-                {getScoreLabel(currentTimeframeScore)}
-              </Text>
-            </View>
+                <View style={[styles.scoreGradeBadge, { backgroundColor: getScoreColor(currentTimeframeScore) + '15' }]}>
+                  <Text style={[styles.scoreGradeText, { color: getScoreColor(currentTimeframeScore) }]}>
+                    {getScoreLabel(currentTimeframeScore)}
+                  </Text>
+                </View>
+              </View>
+            )}
           </>
         )}
 
@@ -586,11 +645,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   scoreGradeBadge: {
-    alignSelf: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    marginBottom: 20,
   },
   scoreGradeText: {
     fontSize: 14,
@@ -631,37 +688,87 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  timeAgoText: {
+    fontSize: 10,
+    marginTop: 2,
+  },
   refreshNeeded: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
     borderRadius: 12,
     marginBottom: 16,
-    gap: 12,
+    gap: 8,
   },
-  refreshNeededText: {
-    fontSize: 14,
+  refreshIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  refreshNeededTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     textAlign: 'center',
-    lineHeight: 20,
+  },
+  refreshNeededSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 8,
   },
   refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginTop: 4,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 8,
+    gap: 6,
   },
   refreshButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
+  },
+  timeframeInfoLeft: {
+    flex: 1,
+  },
+  lastUpdatedText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  miniRefreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 4,
+  },
+  miniRefreshText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  signalBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
   },
   timeframeInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   timeframeInfoText: {
     fontSize: 13,
