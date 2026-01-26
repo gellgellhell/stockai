@@ -14,6 +14,7 @@ import { useTheme } from './ThemeContext';
 import { useAuth } from './AuthContext';
 import { getQuickScore } from './services/aiAnalysis';
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from './services/watchlistService';
+import { getRefreshStatus, useRefresh } from './services/refreshLimitService';
 
 const { width } = Dimensions.get('window');
 
@@ -65,6 +66,14 @@ export default function StockDetailScreen({ route }) {
     longTerm: { score: null, loaded: false, loading: false, lastRefreshed: null },
   });
 
+  // 새로고침 제한 상태
+  const [refreshStatus, setRefreshStatus] = useState({
+    used: 0,
+    limit: 5,
+    remaining: 5,
+    canRefresh: true,
+  });
+
   // 경과 시간 업데이트를 위한 리렌더링
   const [, forceUpdate] = useState(0);
   useEffect(() => {
@@ -72,6 +81,15 @@ export default function StockDetailScreen({ route }) {
       forceUpdate(n => n + 1);
     }, 60000); // 1분마다 업데이트
     return () => clearInterval(interval);
+  }, []);
+
+  // 새로고침 상태 초기화
+  useEffect(() => {
+    const loadRefreshStatus = async () => {
+      const status = await getRefreshStatus(false); // TODO: 프리미엄 여부 확인
+      setRefreshStatus(status);
+    };
+    loadRefreshStatus();
   }, []);
 
   const periods = ['1D', '1W', '1M', '3M', '1Y'];
@@ -106,6 +124,28 @@ export default function StockDetailScreen({ route }) {
   const refreshTimeframe = async (timeframeKey) => {
     const tab = timeframeTabs.find(t => t.key === timeframeKey);
     if (!tab) return;
+
+    // 새로고침 제한 확인 및 차감
+    const refreshResult = await useRefresh(false); // TODO: 프리미엄 여부 확인
+    if (!refreshResult.success) {
+      Alert.alert(
+        '새로고침 제한',
+        `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.\n\n광고를 시청하거나 프리미엄으로 업그레이드하세요.`,
+        [
+          { text: '광고 보기', onPress: () => Alert.alert('준비 중', '광고 기능은 준비 중입니다.') },
+          { text: '확인', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
+    // 새로고침 상태 업데이트
+    setRefreshStatus({
+      used: refreshResult.used,
+      limit: refreshResult.limit,
+      remaining: refreshResult.remaining,
+      canRefresh: refreshResult.canRefresh,
+    });
 
     // 로딩 상태 설정
     setTimeframeData(prev => ({
@@ -272,7 +312,29 @@ export default function StockDetailScreen({ route }) {
       {/* AI 분석 점수 */}
       <View style={[styles.scoreCard, { backgroundColor: colors.card }]}>
         <View style={styles.scoreHeader}>
-          <Text style={[styles.scoreTitle, { color: colors.text }]}>AI 분석 점수</Text>
+          <View style={styles.scoreTitleRow}>
+            <Text style={[styles.scoreTitle, { color: colors.text }]}>AI 분석 점수</Text>
+            <View style={[styles.refreshCountBadge, {
+              backgroundColor: refreshStatus.remaining > 2 ? colors.success + '20' :
+                             refreshStatus.remaining > 0 ? colors.warning + '20' :
+                             colors.error + '20'
+            }]}>
+              <Ionicons
+                name="refresh"
+                size={12}
+                color={refreshStatus.remaining > 2 ? colors.success :
+                       refreshStatus.remaining > 0 ? colors.warning :
+                       colors.error}
+              />
+              <Text style={[styles.refreshCountText, {
+                color: refreshStatus.remaining > 2 ? colors.success :
+                       refreshStatus.remaining > 0 ? colors.warning :
+                       colors.error
+              }]}>
+                {refreshStatus.remaining}/{refreshStatus.limit}
+              </Text>
+            </View>
+          </View>
           {currentData.loading ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : currentTimeframeScore !== null ? (
@@ -631,6 +693,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
+  },
+  scoreTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  refreshCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  refreshCountText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   mainScoreBadge: {
     width: 48,

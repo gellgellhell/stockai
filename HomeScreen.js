@@ -16,6 +16,7 @@ import { useTheme } from './ThemeContext';
 import { useAuth } from './AuthContext';
 import { getQuickScore } from './services/aiAnalysis';
 import { getWatchlist, getWatchlistLimit, removeFromWatchlist } from './services/watchlistService';
+import { getRefreshStatus, useRefresh } from './services/refreshLimitService';
 
 // 임시 AI 점수 생성 (실제로는 AI 분석 결과 사용)
 const generateAIScore = (change) => {
@@ -53,9 +54,23 @@ export default function HomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshCount, setRefreshCount] = useState(5);
   const [selectedTimeframe, setSelectedTimeframe] = useState(DEFAULT_TIMEFRAME);
   const [watchlistLimit, setWatchlistLimit] = useState({ current: 0, limit: 1 });
+  const [refreshStatus, setRefreshStatus] = useState({
+    used: 0,
+    limit: 5,
+    remaining: 5,
+    canRefresh: true,
+  });
+
+  // 새로고침 상태 초기화
+  useEffect(() => {
+    const loadRefreshStatus = async () => {
+      const status = await getRefreshStatus(false); // TODO: 프리미엄 여부 확인
+      setRefreshStatus(status);
+    };
+    loadRefreshStatus();
+  }, []);
 
   const fetchWatchlistData = async () => {
     try {
@@ -189,13 +204,30 @@ export default function HomeScreen({ navigation }) {
     );
   }, [user?.uid]);
 
-  const onRefresh = () => {
-    if (refreshCount <= 0) {
-      alert('무료 새로고침 횟수를 모두 사용했습니다.\n광고를 시청하거나 구독을 업그레이드하세요.');
+  const onRefresh = async () => {
+    // 새로고침 제한 확인 및 차감
+    const refreshResult = await useRefresh(false); // TODO: 프리미엄 여부 확인
+    if (!refreshResult.success) {
+      Alert.alert(
+        '새로고침 제한',
+        `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.\n\n광고를 시청하거나 프리미엄으로 업그레이드하세요.`,
+        [
+          { text: '광고 보기', onPress: () => Alert.alert('준비 중', '광고 기능은 준비 중입니다.') },
+          { text: '확인', style: 'cancel' },
+        ]
+      );
       return;
     }
+
+    // 새로고침 상태 업데이트
+    setRefreshStatus({
+      used: refreshResult.used,
+      limit: refreshResult.limit,
+      remaining: refreshResult.remaining,
+      canRefresh: refreshResult.canRefresh,
+    });
+
     setRefreshing(true);
-    setRefreshCount(prev => prev - 1);
     fetchWatchlistData();
   };
 
@@ -235,7 +267,11 @@ export default function HomeScreen({ navigation }) {
             <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>내 관심 분야 점수</Text>
             <View style={styles.refreshInfo}>
               <Text style={[styles.refreshLabel, { color: colors.textTertiary }]}>새로고침</Text>
-              <Text style={[styles.refreshCount, { color: colors.primary }]}>{refreshCount}/5</Text>
+              <Text style={[styles.refreshCount, {
+                color: refreshStatus.remaining > 2 ? colors.success :
+                       refreshStatus.remaining > 0 ? colors.warning :
+                       colors.error
+              }]}>{refreshStatus.remaining}/{refreshStatus.limit}</Text>
             </View>
           </View>
 
