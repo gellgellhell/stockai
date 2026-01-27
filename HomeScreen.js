@@ -19,6 +19,7 @@ import { getQuickScore } from './services/aiAnalysis';
 import { getWatchlist, getWatchlistLimit, removeFromWatchlist } from './services/watchlistService';
 import { getRefreshStatus, useRefresh, addRefreshByAd } from './services/refreshLimitService';
 import { showRewardedAd, loadRewardedAd, initializeAdMob } from './services/adService';
+import { usePayment } from './PaymentContext';
 
 // 임시 AI 점수 생성 (실제로는 AI 분석 결과 사용)
 const generateAIScore = (change) => {
@@ -53,6 +54,7 @@ export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const colors = theme.colors;
   const { user } = useAuth();
+  const { isPremium, hasUnlimitedRefresh, getRefreshLimit } = usePayment();
   const [refreshing, setRefreshing] = useState(false);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -69,15 +71,20 @@ export default function HomeScreen({ navigation }) {
   // 새로고침 상태 초기화 및 광고 준비
   useEffect(() => {
     const initialize = async () => {
-      const status = await getRefreshStatus(false); // TODO: 프리미엄 여부 확인
-      setRefreshStatus(status);
+      const status = await getRefreshStatus(isPremium);
+      setRefreshStatus({
+        ...status,
+        limit: hasUnlimitedRefresh ? 999 : getRefreshLimit(),
+      });
 
-      // AdMob 초기화 및 광고 미리 로드
-      await initializeAdMob();
-      loadRewardedAd();
+      // 무료 사용자만 광고 초기화
+      if (!isPremium) {
+        await initializeAdMob();
+        loadRewardedAd();
+      }
     };
     initialize();
-  }, []);
+  }, [isPremium, hasUnlimitedRefresh]);
 
   const fetchWatchlistData = async () => {
     try {
@@ -261,34 +268,38 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    // 새로고침 제한 확인 및 차감
-    const refreshResult = await useRefresh(false); // TODO: 프리미엄 여부 확인
-    if (!refreshResult.success) {
-      const message = `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.`;
-      if (Platform.OS === 'web') {
-        if (window.confirm(message + '\n\n광고를 시청하여 새로고침 1회를 추가하시겠습니까?')) {
-          handleWatchAd();
+    // 프리미엄 사용자는 제한 없음
+    if (!hasUnlimitedRefresh) {
+      // 새로고침 제한 확인 및 차감
+      const refreshResult = await useRefresh(isPremium);
+      if (!refreshResult.success) {
+        const message = `오늘의 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.`;
+        if (Platform.OS === 'web') {
+          if (window.confirm(message + '\n\n광고를 시청하여 새로고침 1회를 추가하시겠습니까?')) {
+            handleWatchAd();
+          }
+        } else {
+          Alert.alert(
+            '새로고침 제한',
+            message,
+            [
+              { text: '광고 보기', onPress: handleWatchAd },
+              { text: '프리미엄 구독', onPress: () => navigation.navigate('Subscription') },
+              { text: '취소', style: 'cancel' },
+            ]
+          );
         }
-      } else {
-        Alert.alert(
-          '새로고침 제한',
-          message,
-          [
-            { text: '광고 보기', onPress: handleWatchAd },
-            { text: '취소', style: 'cancel' },
-          ]
-        );
+        return;
       }
-      return;
-    }
 
-    // 새로고침 상태 업데이트
-    setRefreshStatus({
-      used: refreshResult.used,
-      limit: refreshResult.limit,
-      remaining: refreshResult.remaining,
-      canRefresh: refreshResult.canRefresh,
-    });
+      // 새로고침 상태 업데이트
+      setRefreshStatus({
+        used: refreshResult.used,
+        limit: refreshResult.limit,
+        remaining: refreshResult.remaining,
+        canRefresh: refreshResult.canRefresh,
+      });
+    }
 
     setRefreshing(true);
     await loadScores();
@@ -381,26 +392,35 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.refreshInfo}>
               <Text style={[styles.refreshLabel, { color: colors.textTertiary }]}>새로고침</Text>
               <View style={styles.refreshRow}>
-                <Text style={[styles.refreshCount, {
-                  color: refreshStatus.remaining > 2 ? colors.success :
-                         refreshStatus.remaining > 0 ? colors.warning :
-                         colors.error
-                }]}>{refreshStatus.remaining}/{refreshStatus.limit}</Text>
-                {refreshStatus.remaining === 0 && (
-                  <TouchableOpacity
-                    style={[styles.adButton, { backgroundColor: colors.warning }]}
-                    onPress={handleWatchAd}
-                    disabled={isWatchingAd}
-                  >
-                    {isWatchingAd ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Ionicons name="play-circle" size={12} color="#FFFFFF" />
-                        <Text style={styles.adButtonText}>+1</Text>
-                      </>
+                {hasUnlimitedRefresh ? (
+                  <View style={[styles.premiumBadge, { backgroundColor: colors.primary + '20' }]}>
+                    <Ionicons name="infinite" size={14} color={colors.primary} />
+                    <Text style={[styles.premiumBadgeText, { color: colors.primary }]}>무제한</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={[styles.refreshCount, {
+                      color: refreshStatus.remaining > 2 ? colors.success :
+                             refreshStatus.remaining > 0 ? colors.warning :
+                             colors.error
+                    }]}>{refreshStatus.remaining}/{refreshStatus.limit}</Text>
+                    {refreshStatus.remaining === 0 && (
+                      <TouchableOpacity
+                        style={[styles.adButton, { backgroundColor: colors.warning }]}
+                        onPress={handleWatchAd}
+                        disabled={isWatchingAd}
+                      >
+                        {isWatchingAd ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="play-circle" size={12} color="#FFFFFF" />
+                            <Text style={styles.adButtonText}>+1</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
                     )}
-                  </TouchableOpacity>
+                  </>
                 )}
               </View>
             </View>
@@ -478,6 +498,27 @@ export default function HomeScreen({ navigation }) {
             </>
           )}
         </View>
+
+        {/* 프리미엄 홍보 배너 (무료 사용자만) */}
+        {!isPremium && stocks.length > 0 && (
+          <TouchableOpacity
+            style={[styles.promoBanner, { backgroundColor: colors.primaryBg, borderColor: colors.primary + '40' }]}
+            onPress={() => navigation.navigate('Subscription')}
+          >
+            <View style={styles.promoContent}>
+              <View style={[styles.promoIconContainer, { backgroundColor: colors.primary }]}>
+                <Ionicons name="diamond" size={20} color="#FFFFFF" />
+              </View>
+              <View style={styles.promoTextContainer}>
+                <Text style={[styles.promoTitle, { color: colors.text }]}>프리미엄으로 업그레이드</Text>
+                <Text style={[styles.promoSubtitle, { color: colors.textSecondary }]}>
+                  무제한 분석 • AI Vision 점수 • 광고 제거
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        )}
 
         {/* 내 관심 종목 리스트 */}
         <View style={styles.section}>
@@ -650,6 +691,52 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  premiumBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  promoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  promoContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  promoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoTextContainer: {
+    flex: 1,
+  },
+  promoTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  promoSubtitle: {
+    fontSize: 12,
   },
   scoreRow: {
     flexDirection: 'row',

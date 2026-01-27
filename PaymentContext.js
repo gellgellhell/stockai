@@ -263,6 +263,42 @@ export const PaymentProvider = ({ children, userId }) => {
     [userId, refreshSubscription]
   );
 
+  // 프리미엄 기능 확인 헬퍼
+  const isPremium = subscription.hasActiveSubscription && subscription.plan !== 'free';
+  const canUseLevel2 = isPremium || subscription.plan === 'basic' || subscription.plan === 'pro' || subscription.plan === 'premium';
+  const canUseLevel3 = subscription.plan === 'pro' || subscription.plan === 'premium';
+  const hasUnlimitedRefresh = isPremium;
+
+  // 플랜별 새로고침 제한
+  const getRefreshLimit = () => {
+    switch (subscription.plan) {
+      case 'basic': return 50;
+      case 'pro': return 200;
+      case 'premium': return 999;
+      default: return 5;
+    }
+  };
+
+  // 플랜별 관심종목 제한
+  const getWatchlistLimit = () => {
+    switch (subscription.plan) {
+      case 'basic': return 10;
+      case 'pro': return 30;
+      case 'premium': return 100;
+      default: return 3;
+    }
+  };
+
+  // 플랜별 분석 레벨
+  const getMaxAnalysisLevel = () => {
+    switch (subscription.plan) {
+      case 'basic': return 2;
+      case 'pro': return 3;
+      case 'premium': return 3;
+      default: return 1;
+    }
+  };
+
   const value = {
     // 상태
     products,
@@ -275,6 +311,15 @@ export const PaymentProvider = ({ children, userId }) => {
     currentPlan: subscription.plan,
     hasSubscription: subscription.hasActiveSubscription,
     isFreePlan: subscription.plan === 'free',
+    isPremium,
+    canUseLevel2,
+    canUseLevel3,
+    hasUnlimitedRefresh,
+
+    // 플랜별 제한 함수
+    getRefreshLimit,
+    getWatchlistLimit,
+    getMaxAnalysisLevel,
 
     // 메서드
     loadProducts,

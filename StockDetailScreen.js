@@ -13,9 +13,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useAuth } from './AuthContext';
+import { usePayment } from './PaymentContext';
 import { getQuickScore } from './services/aiAnalysis';
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from './services/watchlistService';
 import { getRefreshStatus, useRefresh } from './services/refreshLimitService';
+import { showRewardedAd, loadRewardedAd, initializeAdMob } from './services/adService';
 
 const { width } = Dimensions.get('window');
 
@@ -59,10 +61,11 @@ const getTimeAgo = (timestamp) => {
   return `${days}일 전`;
 };
 
-export default function StockDetailScreen({ route }) {
+export default function StockDetailScreen({ route, navigation }) {
   const { theme } = useTheme();
   const colors = theme.colors;
   const { user } = useAuth();
+  const { isPremium, hasUnlimitedRefresh, getRefreshLimit, getMaxAnalysisLevel, canUseLevel2, canUseLevel3 } = usePayment();
   const { stock } = route.params;
   const [selectedPeriod, setSelectedPeriod] = useState('1D');
   const [isFavorite, setIsFavorite] = useState(false);
@@ -84,6 +87,10 @@ export default function StockDetailScreen({ route }) {
     canRefresh: true,
   });
 
+  // 분석 레벨 상태 (1: 기본, 2: AI, 3: Vision)
+  const [analysisLevel, setAnalysisLevel] = useState(1);
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
+
   // 경과 시간 업데이트를 위한 리렌더링
   const [, forceUpdate] = useState(0);
   useEffect(() => {
@@ -93,14 +100,26 @@ export default function StockDetailScreen({ route }) {
     return () => clearInterval(interval);
   }, []);
 
-  // 새로고침 상태 초기화
+  // 새로고침 상태 초기화 및 광고 준비
   useEffect(() => {
-    const loadRefreshStatus = async () => {
-      const status = await getRefreshStatus(false); // TODO: 프리미엄 여부 확인
-      setRefreshStatus(status);
+    const initialize = async () => {
+      const status = await getRefreshStatus(isPremium);
+      setRefreshStatus({
+        ...status,
+        limit: hasUnlimitedRefresh ? 999 : getRefreshLimit(),
+      });
+
+      // 무료 사용자만 광고 초기화
+      if (!isPremium) {
+        await initializeAdMob();
+        loadRewardedAd();
+      }
+
+      // 사용 가능한 최대 분석 레벨 설정
+      setAnalysisLevel(getMaxAnalysisLevel());
     };
-    loadRefreshStatus();
-  }, []);
+    initialize();
+  }, [isPremium, hasUnlimitedRefresh]);
 
   const periods = ['1D', '1W', '1M', '3M', '1Y'];
   const timeframeTabs = [
@@ -130,37 +149,74 @@ export default function StockDetailScreen({ route }) {
     checkFavoriteStatus();
   }, [user?.uid, stock.symbol]);
 
+  // 광고 시청 핸들러
+  const handleWatchAd = async () => {
+    if (isWatchingAd) return;
+    setIsWatchingAd(true);
+
+    try {
+      const { addRefreshByAd } = require('./services/refreshLimitService');
+      const success = await showRewardedAd(
+        async (reward) => {
+          const result = await addRefreshByAd(1);
+          if (result.success) {
+            const newStatus = await getRefreshStatus(isPremium);
+            setRefreshStatus({
+              ...newStatus,
+              limit: hasUnlimitedRefresh ? 999 : getRefreshLimit(),
+            });
+            showAlert('보상 획득', '새로고침 1회가 추가되었습니다!');
+          }
+        },
+        () => setIsWatchingAd(false)
+      );
+      if (!success) {
+        showAlert('오류', '광고를 불러오는데 실패했습니다.');
+        setIsWatchingAd(false);
+      }
+    } catch (error) {
+      console.error('Watch ad error:', error);
+      setIsWatchingAd(false);
+    }
+  };
+
   // 개별 타임프레임 새로고침 함수
   const refreshTimeframe = async (timeframeKey) => {
     const tab = timeframeTabs.find(t => t.key === timeframeKey);
     if (!tab) return;
 
-    // 새로고침 제한 확인 및 차감
-    const refreshResult = await useRefresh(false); // TODO: 프리미엄 여부 확인
-    if (!refreshResult.success) {
-      const message = `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.\n\n광고를 시청하거나 프리미엄으로 업그레이드하세요.`;
-      if (Platform.OS === 'web') {
-        window.alert(message);
-      } else {
-        Alert.alert(
-          '새로고침 제한',
-          message,
-          [
-            { text: '광고 보기', onPress: () => Alert.alert('준비 중', '광고 기능은 준비 중입니다.') },
-            { text: '확인', style: 'cancel' },
-          ]
-        );
+    // 프리미엄 사용자는 제한 없음
+    if (!hasUnlimitedRefresh) {
+      // 새로고침 제한 확인 및 차감
+      const refreshResult = await useRefresh(isPremium);
+      if (!refreshResult.success) {
+        const message = `오늘의 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.`;
+        if (Platform.OS === 'web') {
+          if (window.confirm(message + '\n\n광고를 시청하여 새로고침 1회를 추가하시겠습니까?')) {
+            handleWatchAd();
+          }
+        } else {
+          Alert.alert(
+            '새로고침 제한',
+            message,
+            [
+              { text: '광고 보기', onPress: handleWatchAd },
+              { text: '프리미엄 구독', onPress: () => navigation.navigate('Subscription') },
+              { text: '취소', style: 'cancel' },
+            ]
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    // 새로고침 상태 업데이트
-    setRefreshStatus({
-      used: refreshResult.used,
-      limit: refreshResult.limit,
-      remaining: refreshResult.remaining,
-      canRefresh: refreshResult.canRefresh,
-    });
+      // 새로고침 상태 업데이트
+      setRefreshStatus({
+        used: refreshResult.used,
+        limit: refreshResult.limit,
+        remaining: refreshResult.remaining,
+        canRefresh: refreshResult.canRefresh,
+      });
+    }
 
     // 로딩 상태 설정
     setTimeframeData(prev => ({
@@ -329,26 +385,33 @@ export default function StockDetailScreen({ route }) {
         <View style={styles.scoreHeader}>
           <View style={styles.scoreTitleRow}>
             <Text style={[styles.scoreTitle, { color: colors.text }]}>AI 분석 점수</Text>
-            <View style={[styles.refreshCountBadge, {
-              backgroundColor: refreshStatus.remaining > 2 ? colors.success + '20' :
-                             refreshStatus.remaining > 0 ? colors.warning + '20' :
-                             colors.error + '20'
-            }]}>
-              <Ionicons
-                name="refresh"
-                size={12}
-                color={refreshStatus.remaining > 2 ? colors.success :
-                       refreshStatus.remaining > 0 ? colors.warning :
-                       colors.error}
-              />
-              <Text style={[styles.refreshCountText, {
-                color: refreshStatus.remaining > 2 ? colors.success :
-                       refreshStatus.remaining > 0 ? colors.warning :
-                       colors.error
+            {hasUnlimitedRefresh ? (
+              <View style={[styles.premiumBadge, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="infinite" size={12} color={colors.primary} />
+                <Text style={[styles.premiumBadgeText, { color: colors.primary }]}>무제한</Text>
+              </View>
+            ) : (
+              <View style={[styles.refreshCountBadge, {
+                backgroundColor: refreshStatus.remaining > 2 ? colors.success + '20' :
+                               refreshStatus.remaining > 0 ? colors.warning + '20' :
+                               colors.error + '20'
               }]}>
-                {refreshStatus.remaining}/{refreshStatus.limit}
-              </Text>
-            </View>
+                <Ionicons
+                  name="refresh"
+                  size={12}
+                  color={refreshStatus.remaining > 2 ? colors.success :
+                         refreshStatus.remaining > 0 ? colors.warning :
+                         colors.error}
+                />
+                <Text style={[styles.refreshCountText, {
+                  color: refreshStatus.remaining > 2 ? colors.success :
+                         refreshStatus.remaining > 0 ? colors.warning :
+                         colors.error
+                }]}>
+                  {refreshStatus.remaining}/{refreshStatus.limit}
+                </Text>
+              </View>
+            )}
           </View>
           {currentData.loading ? (
             <ActivityIndicator size="small" color={colors.primary} />
@@ -723,6 +786,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   refreshCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  premiumBadgeText: {
     fontSize: 12,
     fontWeight: '600',
   },
