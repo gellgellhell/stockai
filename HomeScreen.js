@@ -333,19 +333,40 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
 
-          <View style={styles.scoreRow}>
-            <Text style={[styles.scoreNumber, { color: colors.text }]}>{avgScore}</Text>
-            <Text style={[styles.scoreUnit, { color: colors.text }]}>점</Text>
-            <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(avgScore) + '20' }]}>
-              <Text style={[styles.scoreBadgeText, { color: getScoreColor(avgScore) }]}>
-                {getScoreLabel(avgScore)}
-              </Text>
-            </View>
-          </View>
+          {stocks.length > 0 ? (
+            <>
+              <View style={styles.scoreRow}>
+                <Text style={[styles.scoreNumber, { color: colors.text }]}>{avgScore}</Text>
+                <Text style={[styles.scoreUnit, { color: colors.text }]}>점</Text>
+                <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(avgScore) + '20' }]}>
+                  <Text style={[styles.scoreBadgeText, { color: getScoreColor(avgScore) }]}>
+                    {getScoreLabel(avgScore)}
+                  </Text>
+                </View>
+              </View>
 
-          <Text style={[styles.timeframeHint, { color: colors.textTertiary }]}>
-            기준: {TIMEFRAME_LABELS[selectedTimeframe]} 데이터 기반 AI 분석
-          </Text>
+              <Text style={[styles.timeframeHint, { color: colors.textTertiary }]}>
+                기준: {TIMEFRAME_LABELS[selectedTimeframe]} 데이터 기반 AI 분석
+              </Text>
+            </>
+          ) : (
+            <View style={styles.noWatchlistScore}>
+              <Ionicons name="star-outline" size={32} color={colors.textTertiary} />
+              <Text style={[styles.noWatchlistTitle, { color: colors.textSecondary }]}>
+                등록된 관심종목이 없습니다
+              </Text>
+              <Text style={[styles.noWatchlistSubtitle, { color: colors.textTertiary }]}>
+                관심종목을 등록하면 AI 분석 점수를 확인할 수 있어요
+              </Text>
+              <TouchableOpacity
+                style={[styles.noWatchlistButton, { backgroundColor: colors.primary }]}
+                onPress={() => navigation.navigate('Search')}
+              >
+                <Ionicons name="search" size={16} color="#FFFFFF" />
+                <Text style={styles.noWatchlistButtonText}>종목 검색하기</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* 내 관심 종목 리스트 */}
@@ -550,6 +571,34 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 8,
     textAlign: 'center',
+  },
+  noWatchlistScore: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  noWatchlistTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  noWatchlistSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  noWatchlistButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 8,
+    gap: 6,
+  },
+  noWatchlistButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   section: {
     paddingHorizontal: 16,
