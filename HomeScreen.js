@@ -17,7 +17,8 @@ import { useTheme } from './ThemeContext';
 import { useAuth } from './AuthContext';
 import { getQuickScore } from './services/aiAnalysis';
 import { getWatchlist, getWatchlistLimit, removeFromWatchlist } from './services/watchlistService';
-import { getRefreshStatus, useRefresh } from './services/refreshLimitService';
+import { getRefreshStatus, useRefresh, addRefreshByAd } from './services/refreshLimitService';
+import { showRewardedAd, loadRewardedAd, initializeAdMob } from './services/adService';
 
 // 임시 AI 점수 생성 (실제로는 AI 분석 결과 사용)
 const generateAIScore = (change) => {
@@ -63,14 +64,19 @@ export default function HomeScreen({ navigation }) {
     remaining: 5,
     canRefresh: true,
   });
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
 
-  // 새로고침 상태 초기화
+  // 새로고침 상태 초기화 및 광고 준비
   useEffect(() => {
-    const loadRefreshStatus = async () => {
+    const initialize = async () => {
       const status = await getRefreshStatus(false); // TODO: 프리미엄 여부 확인
       setRefreshStatus(status);
+
+      // AdMob 초기화 및 광고 미리 로드
+      await initializeAdMob();
+      loadRewardedAd();
     };
-    loadRefreshStatus();
+    initialize();
   }, []);
 
   const fetchWatchlistData = async () => {
@@ -258,16 +264,18 @@ export default function HomeScreen({ navigation }) {
     // 새로고침 제한 확인 및 차감
     const refreshResult = await useRefresh(false); // TODO: 프리미엄 여부 확인
     if (!refreshResult.success) {
-      const message = `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.\n\n광고를 시청하거나 프리미엄으로 업그레이드하세요.`;
+      const message = `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.`;
       if (Platform.OS === 'web') {
-        window.alert(message);
+        if (window.confirm(message + '\n\n광고를 시청하여 새로고침 1회를 추가하시겠습니까?')) {
+          handleWatchAd();
+        }
       } else {
         Alert.alert(
           '새로고침 제한',
           message,
           [
-            { text: '광고 보기', onPress: () => Alert.alert('준비 중', '광고 기능은 준비 중입니다.') },
-            { text: '확인', style: 'cancel' },
+            { text: '광고 보기', onPress: handleWatchAd },
+            { text: '취소', style: 'cancel' },
           ]
         );
       }
@@ -285,6 +293,52 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(true);
     await loadScores();
     setRefreshing(false);
+  };
+
+  // 광고 시청으로 새로고침 횟수 추가
+  const handleWatchAd = async () => {
+    if (isWatchingAd) return;
+
+    setIsWatchingAd(true);
+
+    try {
+      const success = await showRewardedAd(
+        // 보상 콜백
+        async (reward) => {
+          console.log('Ad reward earned:', reward);
+          const result = await addRefreshByAd(1);
+          if (result.success) {
+            // 새로고침 상태 업데이트
+            const newStatus = await getRefreshStatus(false);
+            setRefreshStatus(newStatus);
+
+            const message = '광고 시청 완료! 새로고침 1회가 추가되었습니다.';
+            if (Platform.OS === 'web') {
+              window.alert(message);
+            } else {
+              Alert.alert('보상 획득', message);
+            }
+          }
+        },
+        // 광고 종료 콜백
+        () => {
+          setIsWatchingAd(false);
+        }
+      );
+
+      if (!success) {
+        const message = '광고를 불러오는데 실패했습니다. 잠시 후 다시 시도해주세요.';
+        if (Platform.OS === 'web') {
+          window.alert(message);
+        } else {
+          Alert.alert('오류', message);
+        }
+        setIsWatchingAd(false);
+      }
+    } catch (error) {
+      console.error('Watch ad error:', error);
+      setIsWatchingAd(false);
+    }
   };
 
   const formatPrice = (price, type) => {
@@ -326,11 +380,29 @@ export default function HomeScreen({ navigation }) {
             <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>내 관심 분야 점수</Text>
             <View style={styles.refreshInfo}>
               <Text style={[styles.refreshLabel, { color: colors.textTertiary }]}>새로고침</Text>
-              <Text style={[styles.refreshCount, {
-                color: refreshStatus.remaining > 2 ? colors.success :
-                       refreshStatus.remaining > 0 ? colors.warning :
-                       colors.error
-              }]}>{refreshStatus.remaining}/{refreshStatus.limit}</Text>
+              <View style={styles.refreshRow}>
+                <Text style={[styles.refreshCount, {
+                  color: refreshStatus.remaining > 2 ? colors.success :
+                         refreshStatus.remaining > 0 ? colors.warning :
+                         colors.error
+                }]}>{refreshStatus.remaining}/{refreshStatus.limit}</Text>
+                {refreshStatus.remaining === 0 && (
+                  <TouchableOpacity
+                    style={[styles.adButton, { backgroundColor: colors.warning }]}
+                    onPress={handleWatchAd}
+                    disabled={isWatchingAd}
+                  >
+                    {isWatchingAd ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="play-circle" size={12} color="#FFFFFF" />
+                        <Text style={styles.adButtonText}>+1</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
 
@@ -560,6 +632,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#3B82F6',
+  },
+  refreshRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  adButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 3,
+  },
+  adButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   scoreRow: {
     flexDirection: 'row',

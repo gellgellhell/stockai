@@ -1,11 +1,181 @@
 /**
  * 광고 서비스
- * 백엔드 광고 API와 통신
+ * Google AdMob + 백엔드 광고 API 통합
  */
+
+import { Platform } from 'react-native';
 
 const API_BASE_URL = __DEV__
   ? 'http://localhost:3001/api'
   : 'https://stockai-backend-production.up.railway.app/api';
+
+// 웹에서는 광고 비활성화
+const isWeb = Platform.OS === 'web';
+
+// 테스트 광고 ID (실제 배포 시 실제 ID로 교체 필요)
+const AD_UNIT_IDS = {
+  rewarded: {
+    android: 'ca-app-pub-3940256099942544/5224354917', // 테스트 ID
+    ios: 'ca-app-pub-3940256099942544/1712485313',     // 테스트 ID
+  }
+};
+
+let RewardedAd = null;
+let RewardedAdEventType = null;
+let rewardedAd = null;
+let isAdLoaded = false;
+let isAdLoading = false;
+
+/**
+ * AdMob SDK 초기화 (네이티브 환경에서만)
+ */
+export const initializeAdMob = async () => {
+  if (isWeb) {
+    console.log('📺 AdMob disabled on web platform');
+    return false;
+  }
+
+  try {
+    const mobileAds = require('react-native-google-mobile-ads').default;
+    const adModule = require('react-native-google-mobile-ads');
+    RewardedAd = adModule.RewardedAd;
+    RewardedAdEventType = adModule.RewardedAdEventType;
+
+    await mobileAds().initialize();
+    console.log('✅ AdMob initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ AdMob initialization failed:', error);
+    return false;
+  }
+};
+
+/**
+ * 리워드 광고 미리 로드
+ */
+export const loadRewardedAd = () => {
+  if (isWeb || !RewardedAd) {
+    return Promise.resolve(false);
+  }
+
+  if (isAdLoading || isAdLoaded) {
+    return Promise.resolve(isAdLoaded);
+  }
+
+  return new Promise((resolve) => {
+    isAdLoading = true;
+    const adUnitId = Platform.OS === 'ios'
+      ? AD_UNIT_IDS.rewarded.ios
+      : AD_UNIT_IDS.rewarded.android;
+
+    try {
+      rewardedAd = RewardedAd.createForAdRequest(adUnitId, {
+        requestNonPersonalizedAdsOnly: true,
+      });
+
+      const unsubscribeLoaded = rewardedAd.addAdEventListener(
+        RewardedAdEventType.LOADED,
+        () => {
+          console.log('✅ Rewarded ad loaded');
+          isAdLoaded = true;
+          isAdLoading = false;
+          unsubscribeLoaded();
+          resolve(true);
+        }
+      );
+
+      rewardedAd.addAdEventListener('error', (error) => {
+        console.error('❌ Rewarded ad error:', error);
+        isAdLoaded = false;
+        isAdLoading = false;
+        resolve(false);
+      });
+
+      rewardedAd.load();
+    } catch (error) {
+      console.error('❌ Error creating rewarded ad:', error);
+      isAdLoading = false;
+      resolve(false);
+    }
+  });
+};
+
+/**
+ * 리워드 광고 표시 및 보상 처리
+ * @param {Function} onRewarded - 보상 콜백 (광고 시청 완료 시)
+ * @param {Function} onClosed - 광고 종료 콜백
+ * @returns {Promise<boolean>}
+ */
+export const showRewardedAd = async (onRewarded, onClosed) => {
+  // 웹에서는 시뮬레이션 (1초 후 보상)
+  if (isWeb) {
+    console.log('📺 Simulating ad on web...');
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (onRewarded) onRewarded({ type: 'refresh', amount: 1 });
+        if (onClosed) onClosed();
+        resolve(true);
+      }, 1500);
+    });
+  }
+
+  // 광고가 로드되지 않았으면 먼저 로드
+  if (!rewardedAd || !isAdLoaded) {
+    const loaded = await loadRewardedAd();
+    if (!loaded) {
+      console.log('📺 Failed to load ad');
+      return false;
+    }
+  }
+
+  return new Promise((resolve) => {
+    let rewarded = false;
+
+    const unsubscribeEarned = rewardedAd.addAdEventListener(
+      RewardedAdEventType.EARNED_REWARD,
+      (reward) => {
+        console.log('🎁 User earned reward:', reward);
+        rewarded = true;
+        if (onRewarded) onRewarded(reward);
+      }
+    );
+
+    const unsubscribeClosed = rewardedAd.addAdEventListener(
+      'closed',
+      () => {
+        console.log('📺 Ad closed, rewarded:', rewarded);
+        isAdLoaded = false;
+        rewardedAd = null;
+        unsubscribeEarned();
+        unsubscribeClosed();
+        if (onClosed) onClosed();
+        loadRewardedAd(); // 다음 광고 미리 로드
+        resolve(rewarded);
+      }
+    );
+
+    rewardedAd.show().catch((error) => {
+      console.error('❌ Failed to show ad:', error);
+      unsubscribeEarned();
+      unsubscribeClosed();
+      isAdLoaded = false;
+      resolve(false);
+    });
+  });
+};
+
+/**
+ * 광고 준비 상태 확인
+ */
+export const isAdReady = () => {
+  if (isWeb) return true;
+  return isAdLoaded;
+};
+
+/**
+ * 광고 지원 플랫폼 여부
+ */
+export const isAdsSupported = () => !isWeb;
 
 /**
  * 광고 설정 조회
@@ -180,6 +350,13 @@ export const simulateAd = async (userId, adType = 'rewarded', count = 1) => {
 };
 
 export default {
+  // AdMob SDK
+  initializeAdMob,
+  loadRewardedAd,
+  showRewardedAd,
+  isAdReady,
+  isAdsSupported,
+  // Backend API
   getAdConfig,
   getAdStatus,
   canUnlockWithAd,
