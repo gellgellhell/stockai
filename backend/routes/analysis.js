@@ -83,19 +83,17 @@ router.get('/quick/:symbol', checkAnalysisUsage, recordUsage, async (req, res) =
 
     const tfConfig = getTimeframeConfig(timeframe);
 
-    // 캐시 확인 (Level 2, 3만 캐싱 - API 비용 절감)
-    if (analysisLevel >= 2) {
-      const cached = cache.getAnalysis(symbol, type, timeframe, analysisLevel);
-      if (cached.hit) {
-        console.log(`📦 Analysis Cache HIT: ${symbol} L${analysisLevel}`);
-        return res.json({
-          success: true,
-          data: {
-            ...cached.data,
-            fromCache: true
-          }
-        });
-      }
+    // 캐시 확인 (모든 레벨 캐싱 - 5분 이내 동일 요청 시 캐시 사용)
+    const cached = cache.getAnalysis(symbol, type, timeframe, analysisLevel);
+    if (cached.hit) {
+      console.log(`📦 Analysis Cache HIT: ${symbol} L${analysisLevel}`);
+      return res.json({
+        success: true,
+        data: {
+          ...cached.data,
+          fromCache: true
+        }
+      });
     }
 
     console.log(`⚡ Level ${analysisLevel} analysis for ${symbol} on ${tfConfig.label}...`);
@@ -219,10 +217,8 @@ router.get('/quick/:symbol', checkAnalysisUsage, recordUsage, async (req, res) =
       } : null
     };
 
-    // 캐시에 저장 (Level 2, 3만)
-    if (analysisLevel >= 2) {
-      cache.setAnalysis(symbol, type, timeframe, analysisLevel, responseData);
-    }
+    // 캐시에 저장 (모든 레벨 - 5분 TTL)
+    cache.setAnalysis(symbol, type, timeframe, analysisLevel, responseData);
 
     res.json({
       success: true,

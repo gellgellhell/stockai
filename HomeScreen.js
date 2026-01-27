@@ -118,32 +118,14 @@ export default function HomeScreen({ navigation }) {
         }
       }
 
-      // 관심종목이 있으면 AI 점수 가져오기
+      // 관심종목 설정 (점수는 새로고침 시에만 로드)
       if (watchlistItems.length > 0) {
-        const allData = await Promise.all(
-          watchlistItems.map(async (item) => {
-            try {
-              const scoreData = await getQuickScore(
-                item.symbol,
-                item.type || 'crypto',
-                selectedTimeframe
-              );
-              return {
-                ...item,
-                score: scoreData.score || generateAIScore(item.change || 0),
-                timeframe: selectedTimeframe,
-                timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
-              };
-            } catch (err) {
-              return {
-                ...item,
-                score: generateAIScore(item.change || 0),
-                timeframe: selectedTimeframe,
-                timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
-              };
-            }
-          })
-        );
+        const allData = watchlistItems.map(item => ({
+          ...item,
+          score: null, // 초기에는 점수 없음
+          timeframe: selectedTimeframe,
+          timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
+        }));
         setStocks(allData);
       } else {
         setStocks([]);
@@ -154,6 +136,37 @@ export default function HomeScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  // AI 점수만 로드하는 함수 (새로고침 시 호출)
+  const loadScores = async () => {
+    if (stocks.length === 0) return;
+
+    const updatedStocks = await Promise.all(
+      stocks.map(async (item) => {
+        try {
+          const scoreData = await getQuickScore(
+            item.symbol,
+            item.type || 'crypto',
+            selectedTimeframe
+          );
+          return {
+            ...item,
+            score: scoreData.score || null,
+            timeframe: selectedTimeframe,
+            timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
+          };
+        } catch (err) {
+          return {
+            ...item,
+            score: null,
+            timeframe: selectedTimeframe,
+            timeframeLabel: TIMEFRAME_LABELS[selectedTimeframe] || '1D',
+          };
+        }
+      })
+    );
+    setStocks(updatedStocks);
   };
 
   useEffect(() => {
@@ -270,7 +283,8 @@ export default function HomeScreen({ navigation }) {
     });
 
     setRefreshing(true);
-    fetchWatchlistData();
+    await loadScores();
+    setRefreshing(false);
   };
 
   const formatPrice = (price, type) => {
@@ -281,9 +295,12 @@ export default function HomeScreen({ navigation }) {
     return `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   };
 
-  const avgScore = stocks.length > 0
-    ? Math.round(stocks.reduce((sum, s) => sum + (s.score || 0), 0) / stocks.length)
-    : 0;
+  // 점수가 있는 종목만 평균 계산
+  const stocksWithScore = stocks.filter(s => s.score !== null);
+  const avgScore = stocksWithScore.length > 0
+    ? Math.round(stocksWithScore.reduce((sum, s) => sum + s.score, 0) / stocksWithScore.length)
+    : null;
+  const hasAnyScore = stocksWithScore.length > 0;
 
   if (loading) {
     return (
@@ -344,23 +361,7 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
 
-          {stocks.length > 0 ? (
-            <>
-              <View style={styles.scoreRow}>
-                <Text style={[styles.scoreNumber, { color: colors.text }]}>{avgScore}</Text>
-                <Text style={[styles.scoreUnit, { color: colors.text }]}>점</Text>
-                <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(avgScore) + '20' }]}>
-                  <Text style={[styles.scoreBadgeText, { color: getScoreColor(avgScore) }]}>
-                    {getScoreLabel(avgScore)}
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={[styles.timeframeHint, { color: colors.textTertiary }]}>
-                기준: {TIMEFRAME_LABELS[selectedTimeframe]} 데이터 기반 AI 분석
-              </Text>
-            </>
-          ) : (
+          {stocks.length === 0 ? (
             <View style={styles.noWatchlistScore}>
               <Ionicons name="star-outline" size={32} color={colors.textTertiary} />
               <Text style={[styles.noWatchlistTitle, { color: colors.textSecondary }]}>
@@ -377,6 +378,32 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.noWatchlistButtonText}>종목 검색하기</Text>
               </TouchableOpacity>
             </View>
+          ) : !hasAnyScore ? (
+            <View style={styles.noWatchlistScore}>
+              <Ionicons name="refresh-outline" size={32} color={colors.primary} />
+              <Text style={[styles.noWatchlistTitle, { color: colors.textSecondary }]}>
+                AI 분석이 필요합니다
+              </Text>
+              <Text style={[styles.noWatchlistSubtitle, { color: colors.textTertiary }]}>
+                하단의 새로고침 버튼을 눌러 AI 분석을 시작하세요
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.scoreRow}>
+                <Text style={[styles.scoreNumber, { color: colors.text }]}>{avgScore}</Text>
+                <Text style={[styles.scoreUnit, { color: colors.text }]}>점</Text>
+                <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(avgScore) + '20' }]}>
+                  <Text style={[styles.scoreBadgeText, { color: getScoreColor(avgScore) }]}>
+                    {getScoreLabel(avgScore)}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={[styles.timeframeHint, { color: colors.textTertiary }]}>
+                기준: {TIMEFRAME_LABELS[selectedTimeframe]} 데이터 기반 AI 분석
+              </Text>
+            </>
           )}
         </View>
 
@@ -440,12 +467,20 @@ export default function HomeScreen({ navigation }) {
                 </View>
 
                 <View style={styles.scoreContainer}>
-                  <View style={[styles.aiScoreBadge, { backgroundColor: getScoreColor(stock.score || 50) }]}>
-                    <Text style={styles.aiScoreText}>{stock.score || 50}</Text>
-                  </View>
-                  <Text style={[styles.scoreTimeframe, { color: colors.textTertiary }]}>
-                    {stock.timeframeLabel || '1D'}
-                  </Text>
+                  {stock.score !== null ? (
+                    <>
+                      <View style={[styles.aiScoreBadge, { backgroundColor: getScoreColor(stock.score) }]}>
+                        <Text style={styles.aiScoreText}>{stock.score}</Text>
+                      </View>
+                      <Text style={[styles.scoreTimeframe, { color: colors.textTertiary }]}>
+                        {stock.timeframeLabel || '1D'}
+                      </Text>
+                    </>
+                  ) : (
+                    <View style={[styles.aiScoreBadge, { backgroundColor: colors.textTertiary }]}>
+                      <Ionicons name="refresh" size={16} color="#FFFFFF" />
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
 
