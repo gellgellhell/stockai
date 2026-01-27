@@ -231,6 +231,17 @@ export default function HomeScreen({ navigation }) {
   }, [user?.uid]);
 
   const onRefresh = async () => {
+    // 관심종목이 없으면 새로고침 불가
+    if (stocks.length === 0) {
+      const message = '등록된 관심종목이 없습니다.\n관심종목을 먼저 등록해주세요.';
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert('알림', message);
+      }
+      return;
+    }
+
     // 새로고침 제한 확인 및 차감
     const refreshResult = await useRefresh(false); // TODO: 프리미엄 여부 확인
     if (!refreshResult.success) {
