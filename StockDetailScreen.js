@@ -8,6 +8,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -29,6 +30,15 @@ const getScoreLabel = (score) => {
   if (score >= 60) return '좋음';
   if (score >= 40) return '보통';
   return '주의';
+};
+
+// 웹 호환 알림 함수
+const showAlert = (title, message) => {
+  if (Platform.OS === 'web') {
+    window.alert(message);
+  } else {
+    Alert.alert(title, message);
+  }
 };
 
 // 경과 시간 표시 함수
@@ -128,14 +138,19 @@ export default function StockDetailScreen({ route }) {
     // 새로고침 제한 확인 및 차감
     const refreshResult = await useRefresh(false); // TODO: 프리미엄 여부 확인
     if (!refreshResult.success) {
-      Alert.alert(
-        '새로고침 제한',
-        `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.\n\n광고를 시청하거나 프리미엄으로 업그레이드하세요.`,
-        [
-          { text: '광고 보기', onPress: () => Alert.alert('준비 중', '광고 기능은 준비 중입니다.') },
-          { text: '확인', style: 'cancel' },
-        ]
-      );
+      const message = `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.\n\n광고를 시청하거나 프리미엄으로 업그레이드하세요.`;
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert(
+          '새로고침 제한',
+          message,
+          [
+            { text: '광고 보기', onPress: () => Alert.alert('준비 중', '광고 기능은 준비 중입니다.') },
+            { text: '확인', style: 'cancel' },
+          ]
+        );
+      }
       return;
     }
 
@@ -176,14 +191,14 @@ export default function StockDetailScreen({ route }) {
         ...prev,
         [timeframeKey]: { ...prev[timeframeKey], loading: false }
       }));
-      Alert.alert('오류', '점수를 불러오는데 실패했습니다.');
+      showAlert('오류', '점수를 불러오는데 실패했습니다.');
     }
   };
 
   // 관심종목 토글 핸들러
   const handleToggleFavorite = async () => {
     if (!user?.uid) {
-      Alert.alert('로그인 필요', '관심종목 기능을 사용하려면 로그인이 필요합니다.');
+      showAlert('로그인 필요', '관심종목 기능을 사용하려면 로그인이 필요합니다.');
       return;
     }
 
@@ -194,9 +209,9 @@ export default function StockDetailScreen({ route }) {
         const result = await removeFromWatchlist(user.uid, stock.symbol);
         if (result.success) {
           setIsFavorite(false);
-          Alert.alert('삭제 완료', '관심종목에서 삭제되었습니다.');
+          showAlert('삭제 완료', '관심종목에서 삭제되었습니다.');
         } else {
-          Alert.alert('오류', result.error || '삭제에 실패했습니다.');
+          showAlert('오류', result.error || '삭제에 실패했습니다.');
         }
       } else {
         // 관심종목에 추가
@@ -208,14 +223,14 @@ export default function StockDetailScreen({ route }) {
         });
         if (result.success) {
           setIsFavorite(true);
-          Alert.alert('추가 완료', '관심종목에 추가되었습니다.');
+          showAlert('추가 완료', '관심종목에 추가되었습니다.');
         } else {
-          Alert.alert('오류', result.error || '추가에 실패했습니다.');
+          showAlert('오류', result.error || '추가에 실패했습니다.');
         }
       }
     } catch (error) {
       console.error('Toggle favorite error:', error);
-      Alert.alert('오류', '처리 중 오류가 발생했습니다.');
+      showAlert('오류', '처리 중 오류가 발생했습니다.');
     } finally {
       setFavoriteLoading(false);
     }

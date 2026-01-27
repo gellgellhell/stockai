@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -166,56 +167,86 @@ export default function HomeScreen({ navigation }) {
     }, [selectedTimeframe, user?.uid])
   );
 
+  // 관심종목 삭제 실행
+  const executeRemoveStock = async (stock) => {
+    try {
+      const result = await removeFromWatchlist(user.uid, stock.symbol);
+      if (result.success) {
+        // 로컬 상태에서 즉시 제거
+        setStocks(prev => prev.filter(s => s.symbol !== stock.symbol));
+        setWatchlistLimit(prev => ({
+          ...prev,
+          current: Math.max(0, prev.current - 1)
+        }));
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(result.error || '삭제에 실패했습니다.');
+        } else {
+          Alert.alert('오류', result.error || '삭제에 실패했습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('Remove stock error:', error);
+      if (Platform.OS === 'web') {
+        window.alert('삭제 중 오류가 발생했습니다.');
+      } else {
+        Alert.alert('오류', '삭제 중 오류가 발생했습니다.');
+      }
+    }
+  };
+
   // 관심종목 삭제 핸들러
   const handleRemoveStock = useCallback((stock) => {
     if (!user?.uid) {
-      Alert.alert('알림', '로그인이 필요합니다.');
+      if (Platform.OS === 'web') {
+        window.alert('로그인이 필요합니다.');
+      } else {
+        Alert.alert('알림', '로그인이 필요합니다.');
+      }
       return;
     }
 
-    Alert.alert(
-      '관심종목 삭제',
-      `${stock.nameKr || stock.name || stock.symbol}을(를) 관심종목에서 삭제하시겠습니까?`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await removeFromWatchlist(user.uid, stock.symbol);
-              if (result.success) {
-                // 로컬 상태에서 즉시 제거
-                setStocks(prev => prev.filter(s => s.symbol !== stock.symbol));
-                setWatchlistLimit(prev => ({
-                  ...prev,
-                  current: Math.max(0, prev.current - 1)
-                }));
-              } else {
-                Alert.alert('오류', result.error || '삭제에 실패했습니다.');
-              }
-            } catch (error) {
-              console.error('Remove stock error:', error);
-              Alert.alert('오류', '삭제 중 오류가 발생했습니다.');
-            }
+    const stockName = stock.nameKr || stock.name || stock.symbol;
+
+    if (Platform.OS === 'web') {
+      // 웹에서는 window.confirm 사용
+      if (window.confirm(`${stockName}을(를) 관심종목에서 삭제하시겠습니까?`)) {
+        executeRemoveStock(stock);
+      }
+    } else {
+      // 네이티브에서는 Alert.alert 사용
+      Alert.alert(
+        '관심종목 삭제',
+        `${stockName}을(를) 관심종목에서 삭제하시겠습니까?`,
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '삭제',
+            style: 'destructive',
+            onPress: () => executeRemoveStock(stock),
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   }, [user?.uid]);
 
   const onRefresh = async () => {
     // 새로고침 제한 확인 및 차감
     const refreshResult = await useRefresh(false); // TODO: 프리미엄 여부 확인
     if (!refreshResult.success) {
-      Alert.alert(
-        '새로고침 제한',
-        `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.\n\n광고를 시청하거나 프리미엄으로 업그레이드하세요.`,
-        [
-          { text: '광고 보기', onPress: () => Alert.alert('준비 중', '광고 기능은 준비 중입니다.') },
-          { text: '확인', style: 'cancel' },
-        ]
-      );
+      const message = `오늘의 무료 새로고침 횟수(${refreshResult.limit}회)를 모두 사용했습니다.\n\n광고를 시청하거나 프리미엄으로 업그레이드하세요.`;
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert(
+          '새로고침 제한',
+          message,
+          [
+            { text: '광고 보기', onPress: () => Alert.alert('준비 중', '광고 기능은 준비 중입니다.') },
+            { text: '확인', style: 'cancel' },
+          ]
+        );
+      }
       return;
     }
 
