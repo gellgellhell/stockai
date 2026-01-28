@@ -8,10 +8,28 @@ import {
   ActivityIndicator,
   Alert,
   Switch,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePayment } from './PaymentContext';
 import { useTheme } from './ThemeContext';
+
+// 웹 호환 알림 함수
+const showAlert = (title, message, buttons) => {
+  if (Platform.OS === 'web') {
+    if (buttons && buttons.length > 1) {
+      // 확인/취소 버튼이 있는 경우
+      const confirmButton = buttons.find(b => b.text !== '취소');
+      if (window.confirm(`${title}\n\n${message}`)) {
+        confirmButton?.onPress?.();
+      }
+    } else {
+      window.alert(`${title}\n\n${message}`);
+    }
+  } else {
+    Alert.alert(title, message, buttons);
+  }
+};
 
 // 분석 레벨 설명
 const ANALYSIS_LEVELS = [
@@ -62,18 +80,18 @@ export default function SubscriptionScreen() {
   // 구독 구매 처리
   const handleSubscribe = useCallback(async (planId) => {
     if (planId === 'free') {
-      Alert.alert('알림', '현재 Free 플랜을 사용 중입니다.');
+      showAlert('알림', '현재 Free 플랜을 사용 중입니다.');
       return;
     }
 
     if (planId === currentPlan) {
-      Alert.alert('알림', '이미 해당 플랜을 구독 중입니다.');
+      showAlert('알림', '이미 해당 플랜을 구독 중입니다.');
       return;
     }
 
     const product = products.find((p) => p.id === planId);
     if (!product) {
-      Alert.alert('오류', '상품 정보를 찾을 수 없습니다.');
+      showAlert('오류', '상품 정보를 찾을 수 없습니다.');
       return;
     }
 
@@ -82,26 +100,27 @@ export default function SubscriptionScreen() {
       ? `${product.yearlyPrice?.toLocaleString()}원/년`
       : `${product.monthlyPrice?.toLocaleString()}원/월`;
 
-    Alert.alert(
+    const confirmMessage = `${priceText}으로 구독하시겠습니까?\n\n${isYearly ? '연간 결제 시 약 17% 할인!' : '7일 무료 체험 후 결제됩니다.'}`;
+
+    const processPurchase = async () => {
+      // 웹 또는 개발 모드에서는 시뮬레이션
+      const result = (Platform.OS === 'web' || __DEV__)
+        ? await simulatePurchase(selectedProduct?.productId || `${planId}_${isYearly ? 'yearly' : 'monthly'}`)
+        : await purchase(selectedProduct.productId, isYearly);
+
+      if (result.success) {
+        showAlert('구독 완료', `${product.nameKr} 플랜이 활성화되었습니다!`);
+      } else if (!result.cancelled) {
+        showAlert('구독 실패', result.error || '결제 처리 중 오류가 발생했습니다.');
+      }
+    };
+
+    showAlert(
       `${product.nameKr} 플랜 구독`,
-      `${priceText}으로 구독하시겠습니까?\n\n${isYearly ? '연간 결제 시 약 17% 할인!' : '7일 무료 체험 후 결제됩니다.'}`,
+      confirmMessage,
       [
         { text: '취소', style: 'cancel' },
-        {
-          text: '구독하기',
-          onPress: async () => {
-            // 개발 모드에서는 시뮬레이션
-            const result = __DEV__
-              ? await simulatePurchase(selectedProduct.productId)
-              : await purchase(selectedProduct.productId, isYearly);
-
-            if (result.success) {
-              Alert.alert('구독 완료', `${product.nameKr} 플랜이 활성화되었습니다!`);
-            } else if (!result.cancelled) {
-              Alert.alert('구독 실패', result.error || '결제 처리 중 오류가 발생했습니다.');
-            }
-          },
-        },
+        { text: '구독하기', onPress: processPurchase },
       ]
     );
   }, [products, currentPlan, isYearly, purchase, simulatePurchase]);
@@ -112,9 +131,9 @@ export default function SubscriptionScreen() {
     try {
       const result = await restore();
       if (result.success) {
-        Alert.alert('복원 완료', result.message);
+        showAlert('복원 완료', result.message);
       } else {
-        Alert.alert('복원 실패', result.error);
+        showAlert('복원 실패', result.error);
       }
     } finally {
       setRestoring(false);

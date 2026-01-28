@@ -9,6 +9,7 @@ import { OnboardingProvider, useOnboarding } from './OnboardingContext';
 import { WatchlistProvider } from './WatchlistContext';
 import { NotificationProvider } from './NotificationContext';
 import { ThemeProvider, useTheme } from './ThemeContext';
+import { PaymentProvider } from './PaymentContext';
 import { View, ActivityIndicator, Text, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -296,6 +297,22 @@ function KakaoCallbackHandler() {
   );
 }
 
+// 인증된 사용자 컨텐츠 (PaymentProvider 포함)
+function AuthenticatedContent() {
+  const { user } = useAuth();
+  const userId = user?.uid || 'anonymous';
+
+  return (
+    <PaymentProvider userId={userId}>
+      <NotificationProvider userId={userId}>
+        <WatchlistProvider userId={userId}>
+          <AppNavigator />
+        </WatchlistProvider>
+      </NotificationProvider>
+    </PaymentProvider>
+  );
+}
+
 // 내부 앱 컴포넌트 (테마 적용)
 function AppContent() {
   const { theme, isDark } = useTheme();
@@ -325,12 +342,8 @@ function AppContent() {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      <NotificationProvider userId="temp_user">
-        <WatchlistProvider userId="temp_user">
-          <StatusBar style={theme.statusBar} />
-          <AppNavigator />
-        </WatchlistProvider>
-      </NotificationProvider>
+      <StatusBar style={theme.statusBar} />
+      <AuthenticatedContent />
     </NavigationContainer>
   );
 }
