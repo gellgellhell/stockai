@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,39 +7,166 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from './AuthContext';
 import { useTheme } from './ThemeContext';
+import { usePayment } from './PaymentContext';
+import { getRefreshStatus, resetRefreshCount } from './services/refreshLimitService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// 웹 호환 알림 함수
+const showAlert = (title, message, buttons) => {
+  if (Platform.OS === 'web') {
+    if (buttons && buttons.length > 1) {
+      const confirmButton = buttons.find(b => b.style !== 'cancel');
+      if (window.confirm(`${title}\n\n${message}`)) {
+        confirmButton?.onPress?.();
+      }
+    } else {
+      window.alert(`${title}\n\n${message}`);
+    }
+  } else {
+    Alert.alert(title, message, buttons);
+  }
+};
 
 export default function ProfileScreen({ navigation }) {
   const { user: authUser, signOut } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
+  const {
+    currentPlan,
+    isPremium,
+    hasUnlimitedRefresh,
+    getRefreshLimit,
+    getWatchlistLimit,
+    subscription,
+  } = usePayment();
   const colors = theme.colors;
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-  const [morningReportEnabled, setMorningReportEnabled] = React.useState(true);
+
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [morningReportEnabled, setMorningReportEnabled] = useState(true);
+  const [refreshStatus, setRefreshStatus] = useState({ used: 0, limit: 5, remaining: 5 });
+  const [clearingCache, setClearingCache] = useState(false);
+
+  // 새로고침 상태 로드
+  useEffect(() => {
+    const loadStatus = async () => {
+      const status = await getRefreshStatus(isPremium);
+      setRefreshStatus({
+        used: status.used,
+        limit: hasUnlimitedRefresh ? 999 : getRefreshLimit(),
+        remaining: hasUnlimitedRefresh ? 999 : status.remaining,
+      });
+    };
+    loadStatus();
+  }, [isPremium, hasUnlimitedRefresh]);
+
+  // 플랜 이름 한글 변환
+  const getPlanName = () => {
+    switch (currentPlan) {
+      case 'basic': return '베이직';
+      case 'pro': return '프로';
+      case 'premium': return '프리미엄';
+      default: return 'Free';
+    }
+  };
+
+  // 플랜 색상
+  const getPlanColor = () => {
+    switch (currentPlan) {
+      case 'basic': return '#4CAF50';
+      case 'pro': return '#2196F3';
+      case 'premium': return '#9C27B0';
+      default: return colors.textSecondary;
+    }
+  };
+
+  const handleLogout = async () => {
+    showAlert(
+      '로그아웃',
+      '정말 로그아웃 하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '로그아웃',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          }
+        },
+      ]
+    );
+  };
+
+  // 캐시 삭제
+  const handleClearCache = async () => {
+    showAlert(
+      '캐시 삭제',
+      '앱 캐시를 삭제하시겠습니까?\n임시 데이터가 삭제됩니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          onPress: async () => {
+            setClearingCache(true);
+            try {
+              // AsyncStorage에서 캐시 관련 데이터만 삭제
+              const keys = await AsyncStorage.getAllKeys();
+              const cacheKeys = keys.filter(key =>
+                key.includes('cache') || key.includes('temp')
+              );
+              if (cacheKeys.length > 0) {
+                await AsyncStorage.multiRemove(cacheKeys);
+              }
+              showAlert('완료', '캐시가 삭제되었습니다.');
+            } catch (error) {
+              console.error('Clear cache error:', error);
+              showAlert('오류', '캐시 삭제에 실패했습니다.');
+            } finally {
+              setClearingCache(false);
+            }
+          }
+        },
+      ]
+    );
+  };
+
+  // 새로고침 횟수 초기화 (개발용)
+  const handleResetRefresh = async () => {
+    showAlert(
+      '새로고침 초기화',
+      '오늘의 새로고침 횟수를 초기화하시겠습니까?\n(개발 테스트용)',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '초기화',
+          onPress: async () => {
+            const result = await resetRefreshCount();
+            if (result.success) {
+              const status = await getRefreshStatus(isPremium);
+              setRefreshStatus({
+                used: status.used,
+                limit: hasUnlimitedRefresh ? 999 : getRefreshLimit(),
+                remaining: hasUnlimitedRefresh ? 999 : status.remaining,
+              });
+              showAlert('완료', result.message);
+            }
+          }
+        },
+      ]
+    );
+  };
 
   const user = {
     name: authUser?.displayName || '사용자',
     email: authUser?.email || 'user@example.com',
     photoURL: authUser?.photoURL,
-    plan: 'free',
-    stocksUsed: 1,
-    stocksLimit: 1,
-    refreshUsed: 3,
-    refreshLimit: 5,
-  };
-
-  const handleLogout = async () => {
-    // 웹에서는 window.confirm 사용
-    const confirmed = window.confirm('정말 로그아웃 하시겠습니까?');
-    if (confirmed) {
-      try {
-        await signOut();
-      } catch (error) {
-        console.error('Logout error:', error);
-      }
-    }
   };
 
   const MenuItem = ({ icon, title, subtitle, onPress, rightComponent }) => (
@@ -76,27 +203,54 @@ export default function ProfileScreen({ navigation }) {
         onPress={() => navigation.navigate('Subscription')}
       >
         <View style={styles.planHeader}>
-          <View style={[styles.planBadge, { backgroundColor: colors.surfaceSecondary }]}>
-            <Text style={[styles.planBadgeText, { color: colors.textSecondary }]}>Free</Text>
+          <View style={styles.planBadgeRow}>
+            <View style={[styles.planBadge, { backgroundColor: getPlanColor() + '20' }]}>
+              <Text style={[styles.planBadgeText, { color: getPlanColor() }]}>{getPlanName()}</Text>
+            </View>
+            {isPremium && (
+              <View style={[styles.premiumTag, { backgroundColor: colors.primary }]}>
+                <Ionicons name="diamond" size={12} color="#FFFFFF" />
+              </View>
+            )}
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
         </View>
 
+        {subscription.expiresAt && isPremium && (
+          <Text style={[styles.expiryText, { color: colors.textSecondary }]}>
+            만료: {new Date(subscription.expiresAt).toLocaleDateString('ko-KR')}
+          </Text>
+        )}
+
         <View style={styles.usageRow}>
           <View style={styles.usageItem}>
-            <Text style={[styles.usageLabel, { color: colors.textTertiary }]}>등록 종목</Text>
-            <Text style={[styles.usageValue, { color: colors.text }]}>{user.stocksUsed}/{user.stocksLimit}</Text>
+            <Text style={[styles.usageLabel, { color: colors.textTertiary }]}>관심종목 제한</Text>
+            <Text style={[styles.usageValue, { color: colors.text }]}>
+              {getWatchlistLimit() >= 100 ? '무제한' : `${getWatchlistLimit()}개`}
+            </Text>
           </View>
           <View style={[styles.usageDivider, { backgroundColor: colors.border }]} />
           <View style={styles.usageItem}>
             <Text style={[styles.usageLabel, { color: colors.textTertiary }]}>오늘 새로고침</Text>
-            <Text style={[styles.usageValue, { color: colors.text }]}>{user.refreshUsed}/{user.refreshLimit}</Text>
+            {hasUnlimitedRefresh ? (
+              <View style={styles.unlimitedRow}>
+                <Ionicons name="infinite" size={18} color={colors.primary} />
+              </View>
+            ) : (
+              <Text style={[styles.usageValue, { color: colors.text }]}>
+                {refreshStatus.remaining}/{refreshStatus.limit}
+              </Text>
+            )}
           </View>
         </View>
 
-        <View style={[styles.upgradeRow, { borderTopColor: colors.border }]}>
-          <Text style={[styles.upgradeText, { color: colors.primary }]}>업그레이드하고 더 많은 종목 등록하기</Text>
-        </View>
+        {!isPremium && (
+          <View style={[styles.upgradeRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.upgradeText, { color: colors.primary }]}>
+              프리미엄으로 업그레이드하기
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
 
       {/* 알림 설정 */}
@@ -157,12 +311,44 @@ export default function ProfileScreen({ navigation }) {
           <MenuItem
             icon="card-outline"
             title="구독 관리"
+            subtitle={isPremium ? getPlanName() : '무료 플랜'}
             onPress={() => navigation.navigate('Subscription')}
           />
           <MenuItem
             icon="language-outline"
             title="언어"
             subtitle="한국어"
+          />
+          <MenuItem
+            icon="trash-outline"
+            title="캐시 삭제"
+            subtitle="임시 데이터 정리"
+            onPress={handleClearCache}
+            rightComponent={
+              clearingCache ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+              )
+            }
+          />
+        </View>
+      </View>
+
+      {/* 데이터 관리 */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>데이터 관리</Text>
+        <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
+          <MenuItem
+            icon="star-outline"
+            title="관심종목 관리"
+            onPress={() => navigation.navigate('Watchlist')}
+          />
+          <MenuItem
+            icon="refresh-outline"
+            title="새로고침 횟수 초기화"
+            subtitle="테스트용"
+            onPress={handleResetRefresh}
           />
         </View>
       </View>
@@ -251,7 +437,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  planBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   planBadge: {
     backgroundColor: '#F3F4F6',
@@ -263,6 +454,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  premiumTag: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  expiryText: {
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  unlimitedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   usageRow: {
     flexDirection: 'row',
